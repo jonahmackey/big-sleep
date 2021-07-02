@@ -255,7 +255,7 @@ class BigSleep(nn.Module):
         return sign * self.loss_coef * torch.cosine_similarity(text_embed, img_embed, dim = -1).mean()
 
     ##
-    def forward(self, bg_text_embeds, text1_min_embeds=[], fg_text_embeds, text2_min_embeds=[], return_loss = True):
+    def forward(self, bg_text_embeds, fg_text_embeds, text1_min_embeds=[], text2_min_embeds=[], return_loss = True):
         width, num_cutouts = self.image_size, self.num_cutouts
 
         bg, fg, composite = self.model()
@@ -557,7 +557,7 @@ class Imagine(nn.Module):
         if (i + 1) % self.save_every == 0:
             with torch.no_grad():
                 self.model.model.latents.eval()
-                bg, fg, composite, losses = self.model(self.encoded_texts["max"], self.encoded_texts["min"])
+                bg, fg, composite, losses = self.model(bg_text_embeds=self.encoded_texts["bg"], fg_text_embeds=self.encoded_texts["fg"])
                 bg_top_score, bg_best = torch.topk(losses[2], k=1, largest=False)
                 fg_top_score, fg_best = torch.topk(losses[4], k=1, largest=False)
                 bg_image = bg[bg_best].cpu()
