@@ -499,7 +499,7 @@ class Imagine(nn.Module):
             self.encoded_texts[text_type] = [self.create_clip_encoding(text=text, img=img, encoding=encoding)]
 
     def encode_max_and_min(self, text, img=None, encoding=None, text_min="", text_type=None):
-        self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type)
+        self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type=text_type)
         if text_min is not None and text_min != "":
             self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="min")
 
