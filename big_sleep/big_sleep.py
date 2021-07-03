@@ -556,7 +556,8 @@ class Imagine(nn.Module):
 
         if (i + 1) % self.save_every == 0:
             with torch.no_grad():
-                self.model.model.latents.eval()
+                self.model.model.latents1.eval()
+                self.model.model.latents2.eval()
                 bg, fg, composite, losses = self.model(bg_text_embeds=self.encoded_texts["bg"], fg_text_embeds=self.encoded_texts["fg"])
                 bg_top_score, bg_best = torch.topk(losses[2], k=1, largest=False)
                 fg_top_score, fg_best = torch.topk(losses[4], k=1, largest=False)
