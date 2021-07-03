@@ -297,7 +297,7 @@ class BigSleep(nn.Module):
         bg_latents, soft_one_hot_classes1 = self.model.latents1()
         fg_latents, soft_one_hot_classes2 = self.model.latents2()
         
-        num_latents = latents1.shape[0]
+        num_latents = bg_latents.shape[0]
         
         bg_latent_thres = self.model.latents1.model.thresh_lat
         fg_latent_thres = self.model.latents2.model.thresh_lat
