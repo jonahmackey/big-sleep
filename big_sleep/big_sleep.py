@@ -254,7 +254,6 @@ class BigSleep(nn.Module):
             sign = 1
         return sign * self.loss_coef * torch.cosine_similarity(text_embed, img_embed, dim = -1).mean()
 
-    ##
     def forward(self, bg_text_embeds, fg_text_embeds, text1_min_embeds=[], text2_min_embeds=[], return_loss = True):
         width, num_cutouts = self.image_size, self.num_cutouts
 
@@ -350,7 +349,6 @@ class BigSleep(nn.Module):
         sim_loss1 = sum(results1).mean()
         sim_loss2 = sum(results2).mean()
         return bg, fg, composite, (lat_loss1, cls_loss1, sim_loss1, lat_loss2, cls_loss2, sim_loss2)
-    ##
 
 class Imagine(nn.Module):
     def __init__(
@@ -382,7 +380,7 @@ class Imagine(nn.Module):
         ema_decay = 0.99,
         num_cutouts = 128,
         center_bias = False,
-        save_dir = None ###
+        save_dir = None
     ):
         super().__init__()
 
@@ -402,7 +400,6 @@ class Imagine(nn.Module):
         self.epochs = epochs
         self.iterations = iterations
 
-        ##
         model = BigSleep(
             image_size = image_size,
             bilinear = bilinear,
@@ -414,19 +411,16 @@ class Imagine(nn.Module):
             center_bias = center_bias,
             alpha = alpha
         ).cuda()
-        ##
         
         self.model = model
 
         self.lr = lr
         
-        ##
         self.optimizer = Adam(list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()), lr)
-        ##
         
         self.gradient_accumulate_every = gradient_accumulate_every
         self.save_every = save_every
-        self.save_dir = save_dir ###
+        self.save_dir = save_dir
 
         self.save_progress = save_progress
         self.save_date_time = save_date_time
@@ -450,11 +444,9 @@ class Imagine(nn.Module):
             self.comp_filename = Path(f'./{self.save_dir}/"composite"{self.seed_suffix}.png')
         else:
             self.comp_filename = Path(f'./"composite"{self.seed_suffix}.png')
-            
-        ##
+
         self.set_clip_encoding(text=bg_text, text_type = "bg")
         self.set_clip_encoding(text=fg_text, text_type = "fg")
-        ##
         
     @property
     def seed_suffix(self):
@@ -468,7 +460,7 @@ class Imagine(nn.Module):
         self.img = img
         if encoding is not None:
             encoding = encoding.cuda()
-        #elif self.create_story:
+        # elif self.create_story:
         #    encoding = self.update_story_encoding(epoch=0, iteration=1)
         elif text is not None and img is not None:
             encoding = (self.create_text_encoding(text) + self.create_img_encoding(img)) / 2
@@ -641,4 +633,3 @@ class Imagine(nn.Module):
                 if terminate:
                     print('detecting keyboard interrupt, gracefully exiting')
                     return
-    ##
