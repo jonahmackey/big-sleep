@@ -570,16 +570,6 @@ class Imagine(nn.Module):
                     print(f'fg image updated at "./{str(self.fg_filename)}"')
                     print(f'composite image updated at "./{str(self.comp_filename)}"')
                 
-#                 if self.save_dir is not None:
-#             self.comp_filename = Path(f'./{self.save_dir}/"composite"{self.seed_suffix}.png')
-#         else:
-#             self.comp_filename = Path(f'./"composite"{self.seed_suffix}.png')
-                
-#                 if self.save_dir is not None:
-#                 self.bg_filename = Path(f'./{self.save_dir}/{text_path}{self.seed_suffix}.png')
-#             else: 
-#                 self.bg_filename = Path(f'./{text_path}{self.seed_suffix}.png')
-
                 if self.save_progress:
                     total_iterations = epoch * self.iterations + i
                     num = total_iterations // self.save_every
