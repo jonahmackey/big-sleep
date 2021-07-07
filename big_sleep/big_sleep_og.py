@@ -481,7 +481,7 @@ class Imagine(nn.Module):
                     if self.save_dir is not None:
                         save_image(image, Path(f'./{self.save_dir}/{self.text_path}.{num}{self.seed_suffix}.png')
                     else:
-                        save_image(image, Path(f'./{self.text_path}.{num}{self.seed_suffix}.png'))
+                        save_image(image, Path(f'./{self.text_path}.{num}{self.seed_suffix}.png')
 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
@@ -489,7 +489,7 @@ class Imagine(nn.Module):
                     if self.save_dir is not None:
                         save_image(image, Path(f'./{self.save_dir}/{self.text_path}{self.seed_suffix}.best.png')
                     else:
-                        save_image(image, Path(f'./{self.text_path}{self.seed_suffix}.best.png'))
+                        save_image(image, Path(f'./{self.text_path}{self.seed_suffix}.best.png')
                                    
         return out, total_loss
 
