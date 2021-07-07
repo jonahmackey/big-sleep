@@ -468,12 +468,6 @@ class Imagine(nn.Module):
                 image = self.model.model()[best].cpu()
                 self.model.model.latents.train()
 
-                
-#                  if self.save_dir is not None:
-#             self.filename = Path(f'./{self.save_dir}/{text_path}{self.seed_suffix}.png') 
-#         else: 
-#             self.filename = Path(f'./{text_path}{self.seed_suffix}.png')
-
                 save_image(image, str(self.filename))
                 if pbar is not None:
                     pbar.update(1)
@@ -486,7 +480,8 @@ class Imagine(nn.Module):
                     
                     if self.save_dir is not None:
                         save_image(image, Path(f'./{self.save_dir}/{self.text_path}.{num}{self.seed_suffix}.png') 
-                    else: 
+                                   
+                    else:
                         save_image(image, Path(f'./{self.text_path}.{num}{self.seed_suffix}.png'))
 
                 if self.save_best and top_score.item() < self.current_best_score:
@@ -494,6 +489,7 @@ class Imagine(nn.Module):
                                    
                     if self.save_dir is not None:
                         save_image(image, Path(f'./{self.save_dir}/{self.text_path}{self.seed_suffix}.best.png') 
+                                   
                     else: 
                         save_image(image, Path(f'./{self.text_path}{self.seed_suffix}.best.png'))
                                    
