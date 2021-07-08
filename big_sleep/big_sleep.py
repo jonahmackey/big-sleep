@@ -441,9 +441,9 @@ class Imagine(nn.Module):
         # create starting encoding
         
         if self.save_dir is not None:
-            self.comp_filename = Path(f'./{self.save_dir}/'comp'{self.seed_suffix}.png')
+            self.comp_filename = Path(f'./{self.save_dir}/' + 'composite' + f'{self.seed_suffix}.png')
         else:
-            self.comp_filename = Path(f'./'comp'{self.seed_suffix}.png')
+            self.comp_filename = Path(f'./' + 'composite' + f'{self.seed_suffix}.png')
 
         self.set_clip_encoding(text=bg_text, text_type = "bg")
         self.set_clip_encoding(text=fg_text, text_type = "fg")
@@ -577,12 +577,12 @@ class Imagine(nn.Module):
                     if self.save_dir is not None:
                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}.{num}{self.seed_suffix}.png'))
                         save_image(fg_image, Path(f'./{self.save_dir}/{self.fg_text_path}.{num}{self.seed_suffix}.png'))
-                        save_image(comp_image, Path(f'./{self.save_dir}/'comp'.{num}{self.seed_suffix}.png'))
+                        save_image(comp_image, Path(f'./{self.save_dir}/' + 'comp' + f'.{num}{self.seed_suffix}.png'))
                         
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num}{self.seed_suffix}.png'))
                         save_image(fg_image, Path(f'./{self.fg_text_path}.{num}{self.seed_suffix}.png'))
-                        save_image(comp_image, Path(f'./'comp'.{num}{self.seed_suffix}.png'))
+                        save_image(comp_image, Path(f'./' + 'comp' + f'.{num}{self.seed_suffix}.png'))
                 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
@@ -590,12 +590,12 @@ class Imagine(nn.Module):
                     if self.save_dir is not None:
                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}{self.seed_suffix}.png'))
                         save_image(fg_image, Path(f'./{self.save_dir}/{self.fg_text_path}{self.seed_suffix}.png'))
-                        save_image(comp_image, Path(f'./{self.save_dir}/'comp'{self.seed_suffix}.png'))
+                        save_image(comp_image, Path(f'./{self.save_dir}/' + 'comp' + f'{self.seed_suffix}.png'))
                         
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}{self.seed_suffix}.png'))
                         save_image(fg_image, Path(f'./{self.fg_text_path}{self.seed_suffix}.png'))
-                        save_image(comp_image, Path(f'./'comp'{self.seed_suffix}.png'))
+                        save_image(comp_image, Path(f'./' + 'comp' + f'{self.seed_suffix}.png'))
                 
         return bg, fg, composite, total_loss    
         
