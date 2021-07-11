@@ -348,7 +348,7 @@ class BigSleep(nn.Module):
             
         sim_loss1 = sum(results1).mean()
         sim_loss2 = sum(results2).mean()
-        return bg, fg, composite, (lat_loss1, cls_loss1, sim_loss1, lat_loss2, cls_loss2, 2 * sim_loss2)
+        return bg, fg, composite, (lat_loss1, cls_loss1, sim_loss1, lat_loss2, cls_loss2, sim_loss2)
 
 class Imagine(nn.Module):
     def __init__(
