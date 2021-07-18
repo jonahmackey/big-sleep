@@ -457,8 +457,8 @@ class Imagine(nn.Module):
         else:
             self.comp_filename = Path(f'./' + 'comp' + f'{self.seed_suffix}.png')
 
-        self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_type = "bg")
-        self.set_clip_encoding(text=fg_text, text_min=fg_text_min, text_type = "fg")
+        self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_ind = "bg")
+        self.set_clip_encoding(text=fg_text, text_min=fg_text_min, text_ind = "fg")
         
     @property
     def seed_suffix(self):
@@ -515,10 +515,7 @@ class Imagine(nn.Module):
 
     def set_clip_encoding(self, text=None, img=None, encoding=None, text_min="", text_ind=None):
         self.current_best_score = 0
-#         self.text = text
-#         self.text_min = text_min
-    
-        ######
+        
         if len(text_min) > 0:
             full_text = text + "_wout_" + text_min[:255] if text is not None else "wout_" + text_min[:255]
         else:
