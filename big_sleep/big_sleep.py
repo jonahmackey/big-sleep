@@ -521,7 +521,8 @@ class Imagine(nn.Module):
         ######
         if len(text_min) > 0:
             full_text = text + "_wout_" + text_min[:255] if text is not None else "wout_" + text_min[:255]
-        #####
+        else:
+            full_text = text
         
         text_path = create_text_path(text=full_text, img=img, encoding=encoding)
         if self.save_date_time:
