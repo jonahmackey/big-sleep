@@ -356,9 +356,9 @@ class Imagine(nn.Module):
         *,
         bg_text=None,
         fg_text=None,
-        bg_text_min=""
-        fg_text_min=""
-        alpha = None,
+        bg_text_min="",
+        fg_text_min="",
+        alpha=None,
         img=None,
         encoding=None,
         lr = .07,
