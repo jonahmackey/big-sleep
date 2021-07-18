@@ -254,7 +254,7 @@ class BigSleep(nn.Module):
             sign = 1
         return sign * self.loss_coef * torch.cosine_similarity(text_embed, img_embed, dim = -1).mean()
 
-    def forward(self, bg_text_embeds, fg_text_embeds, text1_min_embeds=[], text2_min_embeds=[], return_loss = True):
+    def forward(self, bg_text_embeds, fg_text_embeds, bg_text_min_embeds=[], fg_text_min_embeds=[], return_loss = True):
         width, num_cutouts = self.image_size, self.num_cutouts
 
         bg, fg, composite = self.model()
@@ -338,13 +338,13 @@ class BigSleep(nn.Module):
         
         for bg_txt_embed in bg_text_embeds:
             results1.append(self.sim_txt_to_img(bg_txt_embed, bg_image_embed))
-        for txt1_min_embed in text1_min_embeds:
-            results1.append(self.sim_txt_to_img(txt1_min_embed, bg_image_embed, "min"))
+        for bg_txt_min_embed in bg_text_min_embeds:
+            results1.append(self.sim_txt_to_img(bg_txt_min_embed, bg_image_embed, "min"))
         
         for fg_txt_embed in fg_text_embeds:
             results2.append(self.sim_txt_to_img(fg_txt_embed, comp_image_embed))
-        for txt2_min_embed in text2_min_embeds:
-            results2.append(self.sim_txt_to_img(txt2_min_embed, comp_image_embed, "min"))
+        for fg_txt_min_embed in fg_text_min_embeds:
+            results2.append(self.sim_txt_to_img(fg_txt_min_embed, comp_image_embed, "min"))
             
         sim_loss1 = sum(results1).mean()
         sim_loss2 = sum(results2).mean()
@@ -356,10 +356,11 @@ class Imagine(nn.Module):
         *,
         bg_text=None,
         fg_text=None,
+        bg_text_min=""
+        fg_text_min=""
         alpha = None,
         img=None,
         encoding=None,
-        text_min = "",
         lr = .07,
         image_size = 512,
         gradient_accumulate_every = 1,
@@ -431,22 +432,33 @@ class Imagine(nn.Module):
         self.open_folder = open_folder
         self.total_image_updates = (self.epochs * self.iterations) / self.save_every
         self.encoded_texts = {
-            "max": [],
-            "min": [],
-            "bg": [],
-            "fg": []
-        }
+            "bg_max": [],
+            "bg_min": [],
+            "fg_max": [],
+            "fg_min": []
+        }       
+            
+#             "max": [],
+#             "min": [],
+#             "bg": [],
+#             "fg": []
+#         }
+
+        self.bg_text = bg_text
+        self.fg_text = fg_text
+        self.bg_text_min = bg_text_min
+        self.fg_text_min = fg_text_min
         # create img transform
         self.clip_transform = create_clip_img_transform(224)
         # create starting encoding
         
         if self.save_dir is not None:
-            self.comp_filename = Path(f'./{self.save_dir}/' + 'composite' + f'{self.seed_suffix}.png')
+            self.comp_filename = Path(f'./{self.save_dir}/' + 'comp' + f'{self.seed_suffix}.png')
         else:
-            self.comp_filename = Path(f'./' + 'composite' + f'{self.seed_suffix}.png')
+            self.comp_filename = Path(f'./' + 'comp' + f'{self.seed_suffix}.png')
 
-        self.set_clip_encoding(text=bg_text, text_type = "bg")
-        self.set_clip_encoding(text=fg_text, text_type = "fg")
+        self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_type = "bg")
+        self.set_clip_encoding(text=fg_text, text_min=fg_text_min, text_type = "fg")
         
     @property
     def seed_suffix(self):
@@ -486,28 +498,36 @@ class Imagine(nn.Module):
     
     def encode_multiple_phrases(self, text, img=None, encoding=None, text_type="max"):
         if text is not None and "|" in text:
-            self.encoded_texts[text_type] = [self.create_clip_encoding(text=prompt_min, img=img, encoding=encoding) for prompt_min in text.split("|")]
+            self.encoded_texts[text_type] = [self.create_clip_encoding(text=prompt, img=img, encoding=encoding) for prompt in text.split("|")]
         else:
             self.encoded_texts[text_type] = [self.create_clip_encoding(text=text, img=img, encoding=encoding)]
 
-    def encode_max_and_min(self, text, img=None, encoding=None, text_min="", text_type=None):
-        self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type=text_type)
-        if text_min is not None and text_min != "":
-            self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="min")
+    def encode_max_and_min(self, text, img=None, encoding=None, text_min="", text_ind=None):
+        if text_ind == "bg":
+            self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="bg_max")
+            if text_min is not None and text_min != "":
+                self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="bg_min")
+                
+        else: # text_ind == "fg"
+            self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="fg_max")
+            if text_min is not None and text_min != "":
+                self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="fg_min")
 
-    def set_clip_encoding(self, text=None, img=None, encoding=None, text_min="", text_type=None):
+    def set_clip_encoding(self, text=None, img=None, encoding=None, text_min="", text_ind=None):
         self.current_best_score = 0
-        self.text = text
-        self.text_min = text_min
-        
+#         self.text = text
+#         self.text_min = text_min
+    
+        ######
         if len(text_min) > 0:
-            text = text + "_wout_" + text_min[:255] if text is not None else "wout_" + text_min[:255]
-            
-        text_path = create_text_path(text=text, img=img, encoding=encoding)
+            full_text = text + "_wout_" + text_min[:255] if text is not None else "wout_" + text_min[:255]
+        #####
+        
+        text_path = create_text_path(text=full_text, img=img, encoding=encoding)
         if self.save_date_time:
             text_path = datetime.now().strftime("%y%m%d-%H%M%S-") + text_path
         
-        if text_type == "bg":
+        if text_ind == "bg":
             text_path = 'bg.' + text_path
             self.bg_text_path = text_path
             
@@ -516,7 +536,7 @@ class Imagine(nn.Module):
             else: 
                 self.bg_filename = Path(f'./{text_path}{self.seed_suffix}.png')
         
-        else:  # text_type == "fg"
+        else:  # text_ind == "fg"
             text_path = 'fg.' + text_path
             self.fg_text_path = text_path
             
@@ -525,7 +545,7 @@ class Imagine(nn.Module):
             else: 
                 self.fg_filename = Path(f'./{text_path}{self.seed_suffix}.png')
         
-        self.encode_max_and_min(text, img=img, encoding=encoding, text_min=text_min, text_type=text_type) # Tokenize and encode each prompt
+        self.encode_max_and_min(text, img=img, encoding=encoding, text_min=text_min, text_ind=text_ind) # Tokenize and encode each prompt
 
     def reset(self):
         self.model.reset()
@@ -536,7 +556,11 @@ class Imagine(nn.Module):
         total_loss = 0
 
         for _ in range(self.gradient_accumulate_every):
-            bg, fg, composite, losses = self.model(bg_text_embeds=self.encoded_texts["bg"], fg_text_embeds=self.encoded_texts["fg"])
+            bg, fg, composite, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
+                                                   fg_text_embeds=self.encoded_texts["fg_max"],
+                                                   bg_text_min_embeds=self.encoded_texts["bg_min"],
+                                                   fg_text_min_embeds=self.encoded_texts["fg_min"]
+                                                  )
             loss = sum(losses) / self.gradient_accumulate_every
             total_loss += loss
             loss.backward()
