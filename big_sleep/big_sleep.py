@@ -437,12 +437,6 @@ class Imagine(nn.Module):
             "fg_max": [],
             "fg_min": []
         }       
-            
-#             "max": [],
-#             "min": [],
-#             "bg": [],
-#             "fg": []
-#         }
 
         self.bg_text = bg_text
         self.fg_text = fg_text
@@ -572,7 +566,12 @@ class Imagine(nn.Module):
             with torch.no_grad():
                 self.model.model.latents1.eval()
                 self.model.model.latents2.eval()
-                bg, fg, composite, losses = self.model(bg_text_embeds=self.encoded_texts["bg"], fg_text_embeds=self.encoded_texts["fg"])
+            
+                bg, fg, composite, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
+                                                       fg_text_embeds=self.encoded_texts["fg_max"],
+                                                       bg_text_min_embeds=self.encoded_texts["bg_min"],
+                                                       fg_text_min_embeds=self.encoded_texts["fg_min"]
+                                                      )
                 bg_top_score, bg_best = torch.topk(losses[2], k=1, largest=False)
                 fg_top_score, fg_best = torch.topk(losses[4], k=1, largest=False)
                 bg_image = bg[bg_best].cpu()
