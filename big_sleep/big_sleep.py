@@ -337,7 +337,7 @@ class BigSleep(nn.Module):
         results2 = []
         
         for bg_txt_embed in bg_text_embeds:
-            results1.append(self.sim_txt_to_img(bg_txt_embed, bg_image_embed))
+            results1.append(2 * self.sim_txt_to_img(bg_txt_embed, bg_image_embed))
         for bg_txt_min_embed in bg_text_min_embeds:
             results1.append(self.sim_txt_to_img(bg_txt_min_embed, bg_image_embed, "min"))
         
