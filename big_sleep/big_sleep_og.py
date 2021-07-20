@@ -285,7 +285,7 @@ class BigSleep(nn.Module):
         for txt_embed in text_embeds:
             results.append(self.sim_txt_to_img(txt_embed, image_embed))
         for txt_min_embed in text_min_embeds:
-            results.append(self.sim_txt_to_img(txt_min_embed, image_embed, "min"))
+            results.append(0.5 * self.sim_txt_to_img(txt_min_embed, image_embed, "min"))
         sim_loss = sum(results).mean()
         return out, (lat_loss, cls_loss, sim_loss)
 
