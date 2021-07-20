@@ -398,16 +398,14 @@ class BigSleep(nn.Module):
         
         for fg2_txt_embed in fg2_text_embeds:
             results4.append(self.sim_txt_to_img(fg2_txt_embed, comp2_image_embed))
-        
-        print(results1)
-        
-#         if len(results3) == 0:
-#             results3 = [torch.tensor([0]).cuda()]
-#             results4 = [torch.tensor([0]).cuda()]
+
+        if len(results3) == 0:
+            results3 = [torch.tensor(0, device='cuda:0', dtype=torch.float16)]
+            results4 = [torch.tensor(0, device='cuda:0', dtype=torch.float16)]
         bg_sim_loss = sum(results1).mean()
         comp_sim_loss = sum(results2).mean()
-        bg2_sim_loss = sum(results3)
-        comp2_sim_loss = sum(results4)
+        bg2_sim_loss = sum(results3).mean()
+        comp2_sim_loss = sum(results4).mean()
         
         return bg, bg2, fg, composite, composite2, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss)
 
