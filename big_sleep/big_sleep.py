@@ -682,8 +682,11 @@ class Imagine(nn.Module):
                 bg2_top_score, bg2_best = torch.topk(losses[8], k=1, largest=False)
                 comp2_top_score, comp2_best = torch.topk(losses[9], k=1, largest=False)
                 
-                if (comp_top_score[0] < comp2_top_score[0]) and mult:
-                    fg_image = fg[comp2_best].cpu()
+                if mult:
+                    if (comp_top_score[0] < comp2_top_score[0]):
+                        fg_image = fg[comp2_best].cpu()
+                    else:
+                        fg_image = fg[comp_best].cpu()
                 else:
                     fg_image = fg[comp_best].cpu()
                 
