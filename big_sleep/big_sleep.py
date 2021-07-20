@@ -203,28 +203,28 @@ class Model(nn.Module):
             class_temperature = self.class_temperature
         )
         
-#         latents3 = Latents(
-#             num_latents = len(self.biggan.config.layers) + 1,
-#             num_classes = self.biggan.config.num_classes,
-#             z_dim = self.biggan.config.z_dim,
-#             max_classes = self.max_classes,
-#             class_temperature = self.class_temperature
-#         )
+        latents3 = Latents(
+            num_latents = len(self.biggan.config.layers) + 1,
+            num_classes = self.biggan.config.num_classes,
+            z_dim = self.biggan.config.z_dim,
+            max_classes = self.max_classes,
+            class_temperature = self.class_temperature
+        )
         self.latents1 = EMA(latents1, self.ema_decay)
         self.latents2 = EMA(latents2, self.ema_decay)
-#         self.latents3 = EMA(latents3, self.ema_decay)
+        self.latents3 = EMA(latents3, self.ema_decay)
 
     def forward(self):
         self.biggan.eval()
         bg = self.biggan(*self.latents1(), 1)
         fg = self.biggan(*self.latents2(), 1)
-#         bg2 = self.biggan(*self.latents3(), 1)
+        bg2 = self.biggan(*self.latents3(), 1)
         
         composite = (1 - self.alpha) * bg + self.alpha * fg
-#         composite2 = (1 - self.alpha) * bg2 + self.alpha * fg
+        composite2 = (1 - self.alpha) * bg2 + self.alpha * fg
         
-#         return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2
-          return (bg + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 
+        return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2
+      
 
 
     
