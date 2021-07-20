@@ -225,9 +225,7 @@ class Model(nn.Module):
         
         return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2
       
-
-
-    
+        
 class BigSleep(nn.Module):
     def __init__(
         self,
@@ -405,8 +403,8 @@ class BigSleep(nn.Module):
         
         bg_sim_loss = sum(results1).mean()
         comp_sim_loss = sum(results2).mean()
-        bg2_sim_loss = sum(results3)
-        comp2_sim_loss = sum(results4)
+        bg2_sim_loss = sum(results3) if len(results3) == 0 else sum(results3).mean()
+        comp2_sim_loss = sum(results4) if len(results3) == 0 else sum(results4).mean()
         
         return bg, bg2, fg, composite, composite2, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss)
 
