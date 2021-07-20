@@ -388,12 +388,12 @@ class BigSleep(nn.Module):
         for bg_txt_embed in bg_text_embeds:
             results1.append(self.sim_txt_to_img(bg_txt_embed, bg_image_embed))
         for bg_txt_min_embed in bg_text_min_embeds:
-            results1.append(0.5 * self.sim_txt_to_img(bg_txt_min_embed, bg_image_embed, "min"))
+            results1.append(self.sim_txt_to_img(bg_txt_min_embed, bg_image_embed, "min"))
         
         for fg_txt_embed in fg_text_embeds:
             results2.append(self.sim_txt_to_img(fg_txt_embed, comp_image_embed))
         for fg_txt_min_embed in fg_text_min_embeds:
-            results2.append(self.sim_txt_to_img(0.5 * fg_txt_min_embed, comp_image_embed, "min"))
+            results2.append(self.sim_txt_to_img(fg_txt_min_embed, comp_image_embed, "min"))
         
         for bg2_txt_embed in bg2_text_embeds:
             results3.append(self.sim_txt_to_img(bg2_txt_embed, bg2_image_embed))
