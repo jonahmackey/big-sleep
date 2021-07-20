@@ -400,7 +400,10 @@ class BigSleep(nn.Module):
         
         for fg2_txt_embed in fg2_text_embeds:
             results4.append(self.sim_txt_to_img(fg2_txt_embed, comp2_image_embed))
- 
+        print(results1)
+        
+        print(results1[0].size())
+        
         bg_sim_loss = sum(results1).mean()
         comp_sim_loss = sum(results2).mean()
         bg2_sim_loss = sum(results3).mean()
