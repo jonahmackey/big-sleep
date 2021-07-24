@@ -266,7 +266,7 @@ class BigSleep(nn.Module):
             sign = 1
         return sign * self.loss_coef * torch.cosine_similarity(text_embed, img_embed, dim = -1).mean()
 
-    def forward(self, bg_text_embeds, fg_text_embeds, bg2_text_embeds=[], fg2_text_embeds=[], bg_text_min_embeds=[], fg_text_min_embeds=[], return_loss = True):
+    def forward(self, bg_text_embeds, comp_text_embeds, bg2_text_embeds=[], comp2_text_embeds=[], bg_text_min_embeds=[], comp_text_min_embeds=[], return_loss = True):
         width, num_cutouts = self.image_size, self.num_cutouts
 
         bg, bg2, fg, composite, composite2 = self.model()
@@ -388,16 +388,16 @@ class BigSleep(nn.Module):
         for bg_txt_min_embed in bg_text_min_embeds:
             results1.append(self.sim_txt_to_img(bg_txt_min_embed, bg_image_embed, "min"))
         
-        for fg_txt_embed in fg_text_embeds:
-            results2.append(self.sim_txt_to_img(fg_txt_embed, comp_image_embed))
-        for fg_txt_min_embed in fg_text_min_embeds:
-            results2.append(self.sim_txt_to_img(fg_txt_min_embed, comp_image_embed, "min"))
+        for comp_txt_embed in comp_text_embeds:
+            results2.append(self.sim_txt_to_img(comp_txt_embed, comp_image_embed))
+        for comp_txt_min_embed in comp_text_min_embeds:
+            results2.append(self.sim_txt_to_img(comp_txt_min_embed, comp_image_embed, "min"))
         
         for bg2_txt_embed in bg2_text_embeds:
             results3.append(self.sim_txt_to_img(bg2_txt_embed, bg2_image_embed))
         
-        for fg2_txt_embed in fg2_text_embeds:
-            results4.append(self.sim_txt_to_img(fg2_txt_embed, comp2_image_embed))
+        for comp2_txt_embed in comp2_text_embeds:
+            results4.append(self.sim_txt_to_img(comp2_txt_embed, comp2_image_embed))
         
         if len(results3) == 0:
             results3 = [torch.tensor(0, device='cuda:0', dtype=torch.float16)]
@@ -414,11 +414,11 @@ class Imagine(nn.Module):
         self,
         *,
         bg_text=None,
-        fg_text=None,
+        comp_text=None,
         bg_text_min="",
-        fg_text_min="",
+        comp_text_min="",
         bg_text2=None,
-        fg_text2=None,
+        comp_text2=None,
         alpha=None,
         img=None,
         encoding=None,
@@ -499,37 +499,37 @@ class Imagine(nn.Module):
             "bg_max": [],
             "bg_max2": [],
             "bg_min": [],
-            "fg_max": [],
-            "fg_max2": [],
-            "fg_min": []
+            "comp_max": [],
+            "comp_max2": [],
+            "comp_min": []
         }       
 
         self.bg_text = bg_text
-        self.fg_text = fg_text
+        self.comp_text = comp_text
         self.bg_text_min = bg_text_min
-        self.fg_text_min = fg_text_min
+        self.comp_text_min = comp_text_min
         self.bg_text2 = bg_text2
-        self.fg_text2 = fg_text2
+        self.comp_text2 = comp_text2
         
         # create img transform
         self.clip_transform = create_clip_img_transform(224)
         # create starting encoding
         
         if self.save_dir is not None:
-            self.comp_filename = Path(f'./{self.save_dir}/' + 'comp' + f'{self.seed_suffix}.png')
+            self.fg_filename = Path(f'./{self.save_dir}/' + 'fg' + f'{self.seed_suffix}.png')
         else:
-            self.comp_filename = Path(f'./' + 'comp' + f'{self.seed_suffix}.png')
+            self.fg_filename = Path(f'./' + 'fg' + f'{self.seed_suffix}.png')
 
         self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_ind = "bg")
-        self.set_clip_encoding(text=fg_text, text_min=fg_text_min, text_ind = "fg")
+        self.set_clip_encoding(text=comp_text, text_min=fcomp_text_min, text_ind = "comp")
         
-        if (bg_text2 is not None and bg_text2 != "") and (fg_text2 is not None and fg_text2 != ""):
+        if (bg_text2 is not None and bg_text2 != "") and (comp_text2 is not None and comp_text2 != ""):
             if self.save_dir is not None:
                 self.comp_filename = Path(f'./{self.save_dir}/' + 'comp2' + f'{self.seed_suffix}.png')
             else:
                 self.comp_filename = Path(f'./' + 'comp2' + f'{self.seed_suffix}.png')
             self.set_clip_encoding(text=bg_text2, text_ind = "bg2")
-            self.set_clip_encoding(text=fg_text2, text_ind = "fg2")
+            self.set_clip_encoding(text=comp_text2, text_ind = "comp2")
         
     @property
     def seed_suffix(self):
@@ -580,12 +580,12 @@ class Imagine(nn.Module):
                 self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="bg_min")
         elif text_ind == "bg2":
             self.encode_multiple_phrases(text, text_type="bg_max2")
-        elif text_ind == "fg2":
-            self.encode_multiple_phrases(text, text_type="fg_max2")
-        else: # text_ind == "fg"
-            self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="fg_max")
+        elif text_ind == "comp2":
+            self.encode_multiple_phrases(text, text_type="comp_max2")
+        else: # text_ind == "comp"
+            self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="comp_max")
             if text_min is not None and text_min != "":
-                self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="fg_min")
+                self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="comp_min")
 
     def set_clip_encoding(self, text=None, img=None, encoding=None, text_min="", text_ind=None):
         self.current_best_score = 0
@@ -617,14 +617,14 @@ class Imagine(nn.Module):
             else: 
                 self.bg2_filename = Path(f'./{text_path}{self.seed_suffix}.png')
                 
-        elif text_ind == "fg":
-            text_path = 'fg.' + text_path
-            self.fg_text_path = text_path
+        elif text_ind == "comp":
+            text_path = 'comp.' + text_path
+            self.comp_text_path = text_path
             
             if self.save_dir is not None:
-                self.fg_filename = Path(f'./{self.save_dir}/{text_path}{self.seed_suffix}.png')
+                self.comp_filename = Path(f'./{self.save_dir}/{text_path}{self.seed_suffix}.png')
             else: 
-                self.fg_filename = Path(f'./{text_path}{self.seed_suffix}.png')
+                self.comp_filename = Path(f'./{text_path}{self.seed_suffix}.png')
         
         self.encode_max_and_min(text, img=img, encoding=encoding, text_min=text_min, text_ind=text_ind) # Tokenize and encode each prompt
 
@@ -645,11 +645,11 @@ class Imagine(nn.Module):
         
         for _ in range(self.gradient_accumulate_every):
             bg, bg2, fg, composite, composite2, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
-                                                                    fg_text_embeds=self.encoded_texts["fg_max"],
+                                                                    comp_text_embeds=self.encoded_texts["comp_max"],
                                                                     bg_text_min_embeds=self.encoded_texts["bg_min"],
-                                                                    fg_text_min_embeds=self.encoded_texts["fg_min"],
+                                                                    comp_text_min_embeds=self.encoded_texts["comp_min"],
                                                                     bg2_text_embeds=self.encoded_texts["bg_max2"],
-                                                                    fg2_text_embeds=self.encoded_texts["fg_max2"]
+                                                                    comp2_text_embeds=self.encoded_texts["comp_max2"]
                                                                    )
             if mult:
                 loss = sum(losses) / self.gradient_accumulate_every
@@ -671,11 +671,11 @@ class Imagine(nn.Module):
                 self.model.model.latents2.eval()
                 self.model.model.latents3.eval()
                 bg, bg2, fg, composite, composite2, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
-                                                                        fg_text_embeds=self.encoded_texts["fg_max"],
+                                                                        comp_text_embeds=self.encoded_texts["comp_max"],
                                                                         bg_text_min_embeds=self.encoded_texts["bg_min"],
-                                                                        fg_text_min_embeds=self.encoded_texts["fg_min"],
+                                                                        fg_text_min_embeds=self.encoded_texts["comp_min"],
                                                                         bg2_text_embeds=self.encoded_texts["bg_max2"],
-                                                                        fg2_text_embeds=self.encoded_texts["fg_max2"]
+                                                                        comp2_text_embeds=self.encoded_texts["comp_max2"]
                                                                        )
                 bg_top_score, bg_best = torch.topk(losses[2], k=1, largest=False)
                 comp_top_score, comp_best = torch.topk(losses[5], k=1, largest=False)
