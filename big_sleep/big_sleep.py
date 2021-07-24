@@ -524,7 +524,7 @@ class Imagine(nn.Module):
             self.fg_filename = Path(f'./' + 'fg' + f'{self.seed_suffix}.png')
 
         self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_ind = "bg")
-        self.set_clip_encoding(text=comp_text, text_min=fcomp_text_min, text_ind = "comp")
+        self.set_clip_encoding(text=comp_text, text_min=comp_text_min, text_ind = "comp")
         
         if self.multiple:
             if self.save_dir is not None:
