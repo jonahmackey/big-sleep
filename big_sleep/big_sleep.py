@@ -398,7 +398,9 @@ class BigSleep(nn.Module):
         
         for fg2_txt_embed in fg2_text_embeds:
             results4.append(self.sim_txt_to_img(fg2_txt_embed, comp2_image_embed))
-       
+        
+        print(results1)
+        
         if len(results3) == 0:
             results3 = [torch.tensor(0, device='cuda:0', dtype=torch.float16)]
             results4 = [torch.tensor(0, device='cuda:0', dtype=torch.float16)]
