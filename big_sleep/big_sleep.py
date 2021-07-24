@@ -722,38 +722,38 @@ class Imagine(nn.Module):
     
                     if self.save_dir is not None:
                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}.{num}{self.seed_suffix}.png'))
-                        save_image(fg_image, Path(f'./{self.save_dir}/{self.fg_text_path}.{num}{self.seed_suffix}.png'))
-                        save_image(comp_image, Path(f'./{self.save_dir}/' + 'comp' + f'.{num}{self.seed_suffix}.png'))
+                        save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'.{num}{self.seed_suffix}.png'))
+                        save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}.{num}{self.seed_suffix}.png'))
                         if self.multiple:
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
-                            save_image(comp2_image, Path(f'./{self.save_dir}/' + 'comp2' + f'.{num}{self.seed_suffix}.png'))
+                            save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
                         
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num}{self.seed_suffix}.png'))
-                        save_image(fg_image, Path(f'./{self.fg_text_path}.{num}{self.seed_suffix}.png'))
-                        save_image(comp_image, Path(f'./' + 'comp' + f'.{num}{self.seed_suffix}.png'))
+                        save_image(fg_image, Path('./fg' + f'.{num}{self.seed_suffix}.png'))
+                        save_image(comp_image, Path(f'./{self.comp_text_path}.{num}{self.seed_suffix}.png'))
                         if self.multiple:
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
-                            save_image(comp2_image, Path(f'./' + 'comp2' + f'.{num}{self.seed_suffix}.png'))
+                            save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
                 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
     
                     if self.save_dir is not None:
                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}{self.seed_suffix}.png'))
-                        save_image(fg_image, Path(f'./{self.save_dir}/{self.fg_text_path}{self.seed_suffix}.png'))
-                        save_image(comp_image, Path(f'./{self.save_dir}/' + 'comp' + f'{self.seed_suffix}.png'))
+                        save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'{self.seed_suffix}.png'))
+                        save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}{self.seed_suffix}.png'))
                         if mult:
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}{self.seed_suffix}.png'))
-                            save_image(comp2_image, Path(f'./{self.save_dir}/' + 'comp2' + f'{self.seed_suffix}.png'))
+                            save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}{self.seed_suffix}.png'))
                         
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}{self.seed_suffix}.png'))
-                        save_image(fg_image, Path(f'./' + 'fg' + '{self.seed_suffix}.png'))
+                        save_image(fg_image, Path('./fg' + f'{self.seed_suffix}.png'))
                         save_image(comp_image, Path(f'./{self.comp_text_path}{self.seed_suffix}.png'))
                         if mult:
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}{self.seed_suffix}.png'))
-                            save_image(comp_image, Path(f'./{self.comp2_text_path}{self.seed_suffix}.png'))
+                            save_image(comp2_image, Path(f'./{self.comp2_text_path}{self.seed_suffix}.png'))
                 
         return bg, bg2, fg, composite, composite2, total_loss    
         
