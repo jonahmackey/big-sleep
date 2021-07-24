@@ -399,13 +399,13 @@ class BigSleep(nn.Module):
         for comp2_txt_embed in comp2_text_embeds:
             results4.append(self.sim_txt_to_img(comp2_txt_embed, comp2_image_embed))
         
-        if len(results3) == 0:
-            results3 = [torch.tensor(0, device='cuda:0', dtype=torch.float16)]
-            results4 = [torch.tensor(0, device='cuda:0', dtype=torch.float16)]
-        bg_sim_loss = sum(results1).mean()
-        comp_sim_loss = sum(results2).mean()
-        bg2_sim_loss = sum(results3).mean()
-        comp2_sim_loss = sum(results4).mean()
+        if (len(bg2_text_embeds) == 0) and (len(comp2_text_embeds) == 0):
+            results3 = [torch.tensor([0], device='cuda:0', dtype=torch.float16)]
+            results4 = [torch.tensor([0], device='cuda:0', dtype=torch.float16)]
+        bg_sim_loss = sum(results1) / len(results1)
+        comp_sim_loss = sum(results2) / len(results2)
+        bg2_sim_loss = sum(results3) / len(results3)
+        comp2_sim_loss = sum(results4) / len(results4)
         
         return bg, bg2, fg, composite, composite2, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss)
 
@@ -414,10 +414,10 @@ class Imagine(nn.Module):
         self,
         *,
         bg_text=None,
-        comp_text=None,
         bg_text_min="",
-        comp_text_min="",
         bg_text2=None,
+        comp_text=None,
+        comp_text_min="",
         comp_text2=None,
         alpha=None,
         img=None,
@@ -475,10 +475,13 @@ class Imagine(nn.Module):
         ).cuda()
         
         self.model = model
-
         self.lr = lr
         
-        if (bg_text2 is not None and bg_text2 != ""):
+        self.multiple = False
+        if (bg_text2 is not None and bg_text2 != "") and (comp_text2 is not None and comp_text2 != ""):
+            self.multiple = True
+        
+        if self.multiple:
             self.optimizer = Adam(list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()) + list(model.model.latents3.model.parameters()), lr)
         else:
             self.optimizer = Adam(list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()), lr)
@@ -523,11 +526,11 @@ class Imagine(nn.Module):
         self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_ind = "bg")
         self.set_clip_encoding(text=comp_text, text_min=fcomp_text_min, text_ind = "comp")
         
-        if (bg_text2 is not None and bg_text2 != "") and (comp_text2 is not None and comp_text2 != ""):
+        if self.multiple:
             if self.save_dir is not None:
-                self.comp_filename = Path(f'./{self.save_dir}/' + 'comp2' + f'{self.seed_suffix}.png')
+                self.fg2_filename = Path(f'./{self.save_dir}/' + 'fg2' + f'{self.seed_suffix}.png')
             else:
-                self.comp_filename = Path(f'./' + 'comp2' + f'{self.seed_suffix}.png')
+                self.fg2_filename = Path(f'./' + 'fg2' + f'{self.seed_suffix}.png')
             self.set_clip_encoding(text=bg_text2, text_ind = "bg2")
             self.set_clip_encoding(text=comp_text2, text_ind = "comp2")
         
@@ -554,9 +557,9 @@ class Imagine(nn.Module):
         return encoding
 
     def create_text_encoding(self, text):
-        tokenized_text = tokenize(text).cuda()
+        tokenized_text = tokenize(text).cuda() # size (1, 77)
         with torch.no_grad():
-            text_encoding = perceptor.encode_text(tokenized_text).detach()
+            text_encoding = perceptor.encode_text(tokenized_text).detach() #size (1, 512)
         return text_encoding
     
     def create_img_encoding(self, img):
@@ -578,14 +581,17 @@ class Imagine(nn.Module):
             self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="bg_max")
             if text_min is not None and text_min != "":
                 self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="bg_min")
+                
         elif text_ind == "bg2":
             self.encode_multiple_phrases(text, text_type="bg_max2")
-        elif text_ind == "comp2":
-            self.encode_multiple_phrases(text, text_type="comp_max2")
-        else: # text_ind == "comp"
+            
+        elif text_ind == "comp":
             self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="comp_max")
             if text_min is not None and text_min != "":
                 self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="comp_min")
+                
+        else: # text_ind == "comp2"
+            self.encode_multiple_phrases(text, text_type="comp_max2")
 
     def set_clip_encoding(self, text=None, img=None, encoding=None, text_min="", text_ind=None):
         self.current_best_score = 0
@@ -625,6 +631,15 @@ class Imagine(nn.Module):
                 self.comp_filename = Path(f'./{self.save_dir}/{text_path}{self.seed_suffix}.png')
             else: 
                 self.comp_filename = Path(f'./{text_path}{self.seed_suffix}.png')
+                
+        else: #text_ind == "comp":
+            text_path = 'comp2.' + text_path
+            self.comp2_text_path = text_path
+            
+            if self.save_dir is not None:
+                self.comp2_filename = Path(f'./{self.save_dir}/{text_path}{self.seed_suffix}.png')
+            else: 
+                self.comp2_filename = Path(f'./{text_path}{self.seed_suffix}.png')
         
         self.encode_max_and_min(text, img=img, encoding=encoding, text_min=text_min, text_ind=text_ind) # Tokenize and encode each prompt
 
@@ -639,10 +654,6 @@ class Imagine(nn.Module):
     def train_step(self, epoch, i, pbar=None):
         total_loss = 0
         
-        mult = False
-        if (self.bg_text2 is not None and self.bg_text2 != ""):
-            mult = True
-        
         for _ in range(self.gradient_accumulate_every):
             bg, bg2, fg, composite, composite2, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
                                                                     comp_text_embeds=self.encoded_texts["comp_max"],
@@ -651,7 +662,7 @@ class Imagine(nn.Module):
                                                                     bg2_text_embeds=self.encoded_texts["bg_max2"],
                                                                     comp2_text_embeds=self.encoded_texts["comp_max2"]
                                                                    )
-            if mult:
+            if self.multiple:
                 loss = sum(losses) / self.gradient_accumulate_every
             else: 
                 loss = sum(losses[:6]) / self.gradient_accumulate_every
@@ -661,7 +672,7 @@ class Imagine(nn.Module):
         self.optimizer.step()
         self.model.model.latents1.update()
         self.model.model.latents2.update()
-        if mult:
+        if self.multiple:
             self.model.model.latents3.update()
         self.optimizer.zero_grad()
 
@@ -673,37 +684,25 @@ class Imagine(nn.Module):
                 bg, bg2, fg, composite, composite2, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
                                                                         comp_text_embeds=self.encoded_texts["comp_max"],
                                                                         bg_text_min_embeds=self.encoded_texts["bg_min"],
-                                                                        fg_text_min_embeds=self.encoded_texts["comp_min"],
+                                                                        comp_text_min_embeds=self.encoded_texts["comp_min"],
                                                                         bg2_text_embeds=self.encoded_texts["bg_max2"],
                                                                         comp2_text_embeds=self.encoded_texts["comp_max2"]
                                                                        )
-                bg_top_score, bg_best = torch.topk(losses[2], k=1, largest=False)
-                comp_top_score, comp_best = torch.topk(losses[5], k=1, largest=False)
-                bg2_top_score, bg2_best = torch.topk(losses[8], k=1, largest=False)
-                comp2_top_score, comp2_best = torch.topk(losses[9], k=1, largest=False)
-                
-                if mult:
-                    if (comp_top_score[0] < comp2_top_score[0]):
-                        fg_image = fg[comp2_best].cpu()
-                    else:
-                        fg_image = fg[comp_best].cpu()
-                else:
-                    fg_image = fg[comp_best].cpu()
-                
-                bg_image = bg[bg_best].cpu()
-                comp_image = composite[comp_best].cpu()
-                bg2_image = bg2[bg2_best].cpu()
-                comp2_image = composite2[comp2_best].cpu()
+                fg_image = fg[0].cpu()
+                bg_image = bg[0].cpu()
+                comp_image = composite[0].cpu()
+                bg2_image = bg2[0].cpu()
+                comp2_image = composite2[0].cpu()
                 
                 self.model.model.latents1.train()
                 self.model.model.latents2.train()
-                if mult:
+                if self.multiple:
                     self.model.model.latents3.train()
 
                 save_image(bg_image, str(self.bg_filename))
                 save_image(fg_image, str(self.fg_filename))
                 save_image(comp_image, str(self.comp_filename))
-                if mult:
+                if self.multiple:
                     save_image(bg2_image, str(self.bg2_filename))
                     save_image(comp2_image, str(self.comp2_filename))
                 
@@ -713,6 +712,9 @@ class Imagine(nn.Module):
                     print(f'bg image updated at "./{str(self.bg_filename)}"')
                     print(f'fg image updated at "./{str(self.fg_filename)}"')
                     print(f'composite image updated at "./{str(self.comp_filename)}"')
+                    if self.multiple:
+                        print(f'bg2 image updated at "./{str(self.bg2_filename)}"')
+                        print(f'composite2 image updated at "./{str(self.comp2_filename)}"')
                 
                 if self.save_progress:
                     total_iterations = epoch * self.iterations + i
@@ -722,7 +724,7 @@ class Imagine(nn.Module):
                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}.{num}{self.seed_suffix}.png'))
                         save_image(fg_image, Path(f'./{self.save_dir}/{self.fg_text_path}.{num}{self.seed_suffix}.png'))
                         save_image(comp_image, Path(f'./{self.save_dir}/' + 'comp' + f'.{num}{self.seed_suffix}.png'))
-                        if mult:
+                        if self.multiple:
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.save_dir}/' + 'comp2' + f'.{num}{self.seed_suffix}.png'))
                         
@@ -730,7 +732,7 @@ class Imagine(nn.Module):
                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num}{self.seed_suffix}.png'))
                         save_image(fg_image, Path(f'./{self.fg_text_path}.{num}{self.seed_suffix}.png'))
                         save_image(comp_image, Path(f'./' + 'comp' + f'.{num}{self.seed_suffix}.png'))
-                        if mult:
+                        if self.multiple:
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./' + 'comp2' + f'.{num}{self.seed_suffix}.png'))
                 
@@ -747,11 +749,11 @@ class Imagine(nn.Module):
                         
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}{self.seed_suffix}.png'))
-                        save_image(fg_image, Path(f'./{self.fg_text_path}{self.seed_suffix}.png'))
-                        save_image(comp_image, Path(f'./' + 'comp' + f'{self.seed_suffix}.png'))
+                        save_image(fg_image, Path(f'./' + 'fg' + '{self.seed_suffix}.png'))
+                        save_image(comp_image, Path(f'./{self.comp_text_path}{self.seed_suffix}.png'))
                         if mult:
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}{self.seed_suffix}.png'))
-                            save_image(comp2_image, Path(f'./' + 'comp2' + f'{self.seed_suffix}.png'))
+                            save_image(comp_image, Path(f'./{self.comp2_text_path}{self.seed_suffix}.png'))
                 
         return bg, bg2, fg, composite, composite2, total_loss    
         
