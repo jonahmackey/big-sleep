@@ -134,7 +134,79 @@ def rand_cutout(image, size, center_bias=False, center_focus=2):
 
 perceptor, normalize_image = load('ViT-B/32', jit = False)
 
-# load biggan
+#######
+class Alpha(torch.nn.Module):
+  def __init__(
+      self,
+      grid_range=1,
+      size=512,
+      num_layers=8,
+      layer_width=24,
+      order=2,
+      pass_radius=False
+  ):
+    super().__init__()
+    self.grid_range = grid_range
+    self.size = size
+    self.num_layers = num_layers
+    self.layer_width = layer_width
+    self.order = order
+    self.pass_radius = pass_radius
+
+    self.make_grid()
+
+    # TO-DO: make larger amount of hidden layers
+    layers = []
+
+    for i in range(num_layers):
+      in_channels = layer_width
+      out_channels = layer_width
+
+      if i == 0:
+        in_channels = 2 * order
+        if pass_radius:
+          in_channels += 1
+      if i == num_layers - 1:
+        out_channels = 1
+      
+      layers.append((f'conv{i}', torch.nn.Conv2d(in_channels, out_channels, kernel_size=1)))
+      
+      if i < num_layers - 1:
+        layers.append((f'relu{i}', torch.nn.ReLU()))
+
+    layers.append(('sigmoid', torch.nn.Sigmoid()))
+
+    self.network = torch.nn.Sequential(OrderedDict(layers))
+  
+  def forward(self):
+    mask = self.network(self.input_grid)
+
+    return mask
+
+  def make_grid(self):
+    coord_range = torch.linspace(-self.grid_range, self.grid_range, self.size)
+    x = coord_range.view(-1, 1).repeat(1, coord_range.size(0))
+    y = coord_range.view(1, -1).repeat(coord_range.size(0), 1)
+
+    grid = torch.stack([x, y], dim=0).unsqueeze(0)
+
+    if self.pass_radius:
+      r = x**2 + y**2
+      r = torch.unsqueeze(torch.unsqueeze(r, 0), 0)
+      grid = torch.cat([grid, r], dim=1)
+
+    # concatenate higher power grids
+    for p in range(2, self.order + 1):
+      x2 = x**p
+      y2 = y**p
+
+      grid2 = torch.stack([x2, y2], dim=0).unsqueeze(0)
+      grid = torch.cat([grid, grid2], dim=1)
+
+    self.input_grid = grid
+    
+    
+#######    
 
 class Latents(torch.nn.Module):
     def __init__(
@@ -169,20 +241,29 @@ class Model(nn.Module):
         max_classes = None,
         class_temperature = 2.,
         ema_decay = 0.99,
-        alpha = None
-    ):
+        fixed_alpha = None,
+        alpha_settings = None
+    ):  
         super().__init__()
         assert image_size in (128, 256, 512), 'image size must be one of 128, 256, or 512'
         self.biggan = BigGAN.from_pretrained(f'biggan-deep-{image_size}')
         self.max_classes = max_classes
         self.class_temperature = class_temperature
-        self.ema_decay\
-            = ema_decay
+        self.ema_decay = ema_decay
         
-        if alpha is None:
-            self.alpha = torch.ones((3, image_size, image_size))   
+        if fixed_alpha is None:
+            self.alpha = Alpha(
+                size = alpha_settings['size'],
+                grid_range = alpha_settings['grid_range'],
+                num_layers = alpha_settings['num_layers'],
+                layer_width = alpha_settings['layer_width'],
+                order = alpha_settings['order'],
+                pass_radius = alpha_settings['pass_radius']
+            )
+            self.fixed_alpha = False
         else:
-            self.alpha = alpha
+            self.alpha = fixed_alpha.cuda()
+            self.fixed_alpha = True
 
         self.init_latents()
     
@@ -220,10 +301,18 @@ class Model(nn.Module):
         fg = self.biggan(*self.latents2(), 1)
         bg2 = self.biggan(*self.latents3(), 1)
         
-        composite = (1 - self.alpha) * bg + self.alpha * fg
-        composite2 = (1 - self.alpha) * bg2 + self.alpha * fg
+        if not self.fixed_alpha:
+            alpha = self.alpha()[0].cuda()
+            composite = (1 - alpha) * bg + alpha * fg
+            composite2 = (1 - alpha) * bg2 + alpha * fg
+            
+            return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2, alpha
         
-        return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2
+        else:
+            composite = (1 - self.alpha) * bg + self.alpha * fg
+            composite2 = (1 - self.alpha) * bg2 + self.alpha * fg
+        
+            return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2, self.alpha
       
         
 class BigSleep(nn.Module):
@@ -238,7 +327,8 @@ class BigSleep(nn.Module):
         experimental_resample = False,
         ema_decay = 0.99,
         center_bias = False,
-        alpha = None
+        fixed_alpha = None,
+        alpha_settings = None
     ):
         super().__init__()
         self.loss_coef = loss_coef
@@ -254,7 +344,8 @@ class BigSleep(nn.Module):
             max_classes = max_classes,
             class_temperature = class_temperature,
             ema_decay = ema_decay,
-            alpha = alpha
+            fixed_alpha = fixed_alpha,
+            alpha_settings = alpha_settings
         )
 
     def reset(self):
@@ -269,10 +360,10 @@ class BigSleep(nn.Module):
     def forward(self, bg_text_embeds, comp_text_embeds, bg2_text_embeds=[], comp2_text_embeds=[], bg_text_min_embeds=[], comp_text_min_embeds=[], return_loss = True):
         width, num_cutouts = self.image_size, self.num_cutouts
 
-        bg, bg2, fg, composite, composite2 = self.model()
+        bg, bg2, fg, composite, composite2, alpha = self.model()
 
         if not return_loss:
-            return bg, bg2, fg, composite1, composite2
+            return bg, bg2, fg, composite1, composite2, alpha
 
         bg_pieces = []
         comp_pieces = []
@@ -407,7 +498,7 @@ class BigSleep(nn.Module):
         bg2_sim_loss = sum(results3) / len(results3)
         comp2_sim_loss = sum(results4) / len(results4)
         
-        return bg, bg2, fg, composite, composite2, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss)
+        return bg, bg2, fg, composite, composite2, alpha, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss)
 
 class Imagine(nn.Module):
     def __init__(
@@ -419,7 +510,8 @@ class Imagine(nn.Module):
         comp_text=None,
         comp_text_min="",
         comp_text2=None,
-        alpha=None,
+        fixed_alpha=None,
+        alpha_settings=None
         img=None,
         encoding=None,
         lr = .07,
@@ -471,7 +563,8 @@ class Imagine(nn.Module):
             ema_decay = ema_decay,
             num_cutouts = num_cutouts,
             center_bias = center_bias,
-            alpha = alpha
+            fixed_alpha = fixed_alpha,
+            alpha_settings = alpha_settings
         ).cuda()
         
         self.model = model
@@ -481,10 +574,33 @@ class Imagine(nn.Module):
         if (bg_text2 is not None and bg_text2 != "") and (comp_text2 is not None and comp_text2 != ""):
             self.multiple = True
         
+        self.fixed_alpha = False
+        if fixed_alpha is not None:
+            self.fixed_alpha = True
+        
+        grouped_params = []
         if self.multiple:
-            self.optimizer = Adam(list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()) + list(model.model.latents3.model.parameters()), lr)
+            latent_params = {
+                'params': list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()) + list(model.model.latents3.model.parameters()),
+                'lr': lr
+            }
+            grouped_params.append(latent_params)
         else:
-            self.optimizer = Adam(list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()), lr)
+            latent_params = {
+                'params': list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()),
+                'lr': lr
+            }
+            grouped_params.append(latent_params)
+            
+        if fixed_alpha is None:
+            alpha_params = {
+                'params': model.model.alpha.parameters(),
+                'lr': alpha_settings['lr']
+            }
+            grouped_params.append(alpha_params)
+            
+        self.optimizer = Adam(grouped_params)
+        
         
         self.gradient_accumulate_every = gradient_accumulate_every
         self.save_every = save_every
@@ -520,17 +636,17 @@ class Imagine(nn.Module):
         
         if self.save_dir is not None:
             self.fg_filename = Path(f'./{self.save_dir}/' + 'fg' + f'{self.seed_suffix}.png')
+            if fixed_alpha is None:
+                self.alpha_filename = Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png')
         else:
             self.fg_filename = Path(f'./' + 'fg' + f'{self.seed_suffix}.png')
+            if fixed_alpha is None:
+                self.alpha_filename = Path(f'./' + 'alpha' + f'{self.seed_suffix}.png')
 
         self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_ind = "bg")
         self.set_clip_encoding(text=comp_text, text_min=comp_text_min, text_ind = "comp")
         
         if self.multiple:
-            if self.save_dir is not None:
-                self.fg2_filename = Path(f'./{self.save_dir}/' + 'fg2' + f'{self.seed_suffix}.png')
-            else:
-                self.fg2_filename = Path(f'./' + 'fg2' + f'{self.seed_suffix}.png')
             self.set_clip_encoding(text=bg_text2, text_ind = "bg2")
             self.set_clip_encoding(text=comp_text2, text_ind = "comp2")
         
@@ -646,22 +762,41 @@ class Imagine(nn.Module):
     def reset(self):
         self.model.reset()
         self.model = self.model.cuda()
-        if (self.bg_text2 is not None and self.bg_text2 != ""):
-            self.optimizer = Adam(list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()) + list(model.model.latents3.model.parameters()), lr)
+        
+        grouped_params = []
+        if self.multiple:
+            latent_params = {
+                'params': list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()) + list(model.model.latents3.model.parameters()),
+                'lr': lr
+            }
+            grouped_params.append(latent_params)
         else:
-            self.optimizer = Adam(list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()), lr)
+            latent_params = {
+                'params': list(model.model.latents1.model.parameters()) + list(model.model.latents2.model.parameters()),
+                'lr': lr
+            }
+            grouped_params.append(latent_params)
+            
+        if fixed_alpha is None:
+            alpha_params = {
+                'params': model.model.alpha.parameters(),
+                'lr': alpha_settings['lr']
+            }
+            grouped_params.append(alpha_params)
+            
+        self.optimizer = Adam(grouped_params)
 
     def train_step(self, epoch, i, pbar=None):
         total_loss = 0
         
         for _ in range(self.gradient_accumulate_every):
-            bg, bg2, fg, composite, composite2, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
-                                                                    comp_text_embeds=self.encoded_texts["comp_max"],
-                                                                    bg_text_min_embeds=self.encoded_texts["bg_min"],
-                                                                    comp_text_min_embeds=self.encoded_texts["comp_min"],
-                                                                    bg2_text_embeds=self.encoded_texts["bg_max2"],
-                                                                    comp2_text_embeds=self.encoded_texts["comp_max2"]
-                                                                   )
+            bg, bg2, fg, composite, composite2, alpha, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
+                                                                           comp_text_embeds=self.encoded_texts["comp_max"],
+                                                                           bg_text_min_embeds=self.encoded_texts["bg_min"],
+                                                                           comp_text_min_embeds=self.encoded_texts["comp_min"],
+                                                                           bg2_text_embeds=self.encoded_texts["bg_max2"],
+                                                                           comp2_text_embeds=self.encoded_texts["comp_max2"]
+                                                                          )
             if self.multiple:
                 loss = sum(losses) / self.gradient_accumulate_every
             else: 
@@ -674,6 +809,7 @@ class Imagine(nn.Module):
         self.model.model.latents2.update()
         if self.multiple:
             self.model.model.latents3.update()
+        
         self.optimizer.zero_grad()
 
         if (i + 1) % self.save_every == 0:
@@ -681,18 +817,19 @@ class Imagine(nn.Module):
                 self.model.model.latents1.eval()
                 self.model.model.latents2.eval()
                 self.model.model.latents3.eval()
-                bg, bg2, fg, composite, composite2, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
-                                                                        comp_text_embeds=self.encoded_texts["comp_max"],
-                                                                        bg_text_min_embeds=self.encoded_texts["bg_min"],
-                                                                        comp_text_min_embeds=self.encoded_texts["comp_min"],
-                                                                        bg2_text_embeds=self.encoded_texts["bg_max2"],
-                                                                        comp2_text_embeds=self.encoded_texts["comp_max2"]
-                                                                       )
+                bg, bg2, fg, composite, composite2, alpha, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
+                                                                               comp_text_embeds=self.encoded_texts["comp_max"],
+                                                                               bg_text_min_embeds=self.encoded_texts["bg_min"],
+                                                                               comp_text_min_embeds=self.encoded_texts["comp_min"],
+                                                                               bg2_text_embeds=self.encoded_texts["bg_max2"],
+                                                                               comp2_text_embeds=self.encoded_texts["comp_max2"]
+                                                                              )
                 fg_image = fg[0].cpu()
                 bg_image = bg[0].cpu()
                 comp_image = composite[0].cpu()
                 bg2_image = bg2[0].cpu()
                 comp2_image = composite2[0].cpu()
+                alpha_image = alpha.cpu()
                 
                 self.model.model.latents1.train()
                 self.model.model.latents2.train()
@@ -705,6 +842,8 @@ class Imagine(nn.Module):
                 if self.multiple:
                     save_image(bg2_image, str(self.bg2_filename))
                     save_image(comp2_image, str(self.comp2_filename))
+                if not self.fixed_alpha:
+                    save_image(alpha_image, str(self.alpha_filename), normalize=True)
                 
                 if pbar is not None:
                     pbar.update(1)
@@ -727,6 +866,8 @@ class Imagine(nn.Module):
                         if self.multiple:
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
+                        if not self.fixed_alpha:
+                            save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num}{self.seed_suffix}.png'), normalize=True)
                         
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num}{self.seed_suffix}.png'))
@@ -735,6 +876,8 @@ class Imagine(nn.Module):
                         if self.multiple:
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
+                        if not self.fixed_alpha:
+                            save_image(alpha_image, Path('./alpha' + f'.{num}{self.seed_suffix}.png'), normalize=True)
                 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
@@ -743,19 +886,23 @@ class Imagine(nn.Module):
                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}{self.seed_suffix}.png'))
                         save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'{self.seed_suffix}.png'))
                         save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}{self.seed_suffix}.png'))
-                        if mult:
+                        if self.multiple:
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}{self.seed_suffix}.png'))
+                        if not self.fixed_alpha:
+                            save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png'), normalize=True)
                         
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}{self.seed_suffix}.png'))
                         save_image(fg_image, Path('./fg' + f'{self.seed_suffix}.png'))
                         save_image(comp_image, Path(f'./{self.comp_text_path}{self.seed_suffix}.png'))
-                        if mult:
+                        if self.multiple:
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.comp2_text_path}{self.seed_suffix}.png'))
+                        if not self.fixed_alpha:
+                            save_image(alpha_image, Path('./alpha' + f'{self.seed_suffix}.png'), normalize=True)
                 
-        return bg, bg2, fg, composite, composite2, total_loss    
+        return bg, bg2, fg, composite, composite2, alpha, total_loss    
         
     def forward(self):
         penalizing = ""
