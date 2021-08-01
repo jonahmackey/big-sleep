@@ -204,7 +204,7 @@ class Alpha(torch.nn.Module):
       grid2 = torch.stack([x2, y2], dim=0).unsqueeze(0)
       grid = torch.cat([grid, grid2], dim=1)
 
-    self.input_grid = grid
+    self.input_grid = grid.cuda()
     
     
 #######    
