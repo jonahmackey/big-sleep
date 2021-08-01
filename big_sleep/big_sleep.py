@@ -511,7 +511,7 @@ class Imagine(nn.Module):
         comp_text_min="",
         comp_text2=None,
         fixed_alpha=None,
-        alpha_settings=None
+        alpha_settings=None,
         img=None,
         encoding=None,
         lr = .07,
