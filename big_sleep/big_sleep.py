@@ -937,7 +937,8 @@ class Imagine(nn.Module):
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                             save_image(grid_image, Path('./grid' + f'{self.seed_suffix}.png'))
-                
+                            
+                print("losses:", losses)
         return bg, bg2, fg, composite, composite2, alpha, total_loss    
         
     def forward(self):
