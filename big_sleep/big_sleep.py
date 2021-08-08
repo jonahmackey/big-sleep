@@ -539,7 +539,8 @@ class Imagine(nn.Module):
         num_cutouts = 128,
         center_bias = False,
         save_dir = None,
-        save_grid = False
+        save_grid = False,
+        save_grid_progress = False
     ):
         super().__init__()
 
@@ -613,6 +614,7 @@ class Imagine(nn.Module):
         self.save_grid = save_grid
 
         self.save_progress = save_progress
+        self.save_grid_progress = save_grid_progress
         self.save_date_time = save_date_time
 
         self.save_best = save_best
@@ -953,7 +955,7 @@ class Imagine(nn.Module):
                 print("cls_loss3:", losses[7].item())
                 print("bg2_sim_loss:", losses[8].item())
                 print("comp2_sim_loss:", losses[9].item() / 2)
-                print("be_loss:", losses[10].item())
+#                 print("be_loss:", losses[10].item())
         return bg, bg2, fg, composite, composite2, alpha, total_loss    
         
     def forward(self):
