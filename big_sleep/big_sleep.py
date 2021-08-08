@@ -335,6 +335,8 @@ class BigSleep(nn.Module):
         self.num_cutouts = num_cutouts
         self.experimental_resample = experimental_resample
         self.center_bias = center_bias
+        self.fixed_alpha = fixed_alpha
+        self.alpha_settings = alpha_settings
 
         self.interpolation_settings = {'mode': 'bilinear', 'align_corners': False} if bilinear else {'mode': 'nearest'}
 
@@ -501,7 +503,7 @@ class BigSleep(nn.Module):
         if self.fixed_alpha is None:
 #           mask_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
             mask_loss = -4 * (alpha - 0.5) ** 2 + 1
-            mask_loss = self.model.alpha_settings['loss_weight'] * (mask_loss.sum() / (self.image_size ** 2))
+            mask_loss = self.alpha_settings['loss_weight'] * (mask_loss.sum() / (self.image_size ** 2))
         else:
             mask_loss = 0
         
