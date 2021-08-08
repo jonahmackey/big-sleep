@@ -540,7 +540,6 @@ class Imagine(nn.Module):
         center_bias = False,
         save_dir = None,
         save_grid = False,
-        save_grid_progress = False
     ):
         super().__init__()
 
@@ -614,7 +613,6 @@ class Imagine(nn.Module):
         self.save_grid = save_grid
 
         self.save_progress = save_progress
-        self.save_grid_progress = save_grid_progress
         self.save_date_time = save_date_time
 
         self.save_best = save_best
