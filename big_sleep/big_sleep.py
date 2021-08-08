@@ -251,6 +251,7 @@ class Model(nn.Module):
         self.max_classes = max_classes
         self.class_temperature = class_temperature
         self.ema_decay = ema_decay
+        self.alpha_settings = alpha_settings
         
         if fixed_alpha is None:
             self.alpha = Alpha(
@@ -497,7 +498,11 @@ class BigSleep(nn.Module):
         bg2_sim_loss = sum(results3) / len(results3)
         comp2_sim_loss = sum(results4) / len(results4)
         
-        return bg, bg2, fg, composite, composite2, alpha, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss)
+        # binary entropy loss:
+        be_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
+        be_loss = self.model.alpha_settings['be_weight'] * (be_loss.sum() / (self.image_size ** 2))
+        
+        return bg, bg2, fg, composite, composite2, alpha, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss, be_loss)
 
 class Imagine(nn.Module):
     def __init__(
@@ -948,6 +953,7 @@ class Imagine(nn.Module):
                 print("cls_loss3:", losses[7].item())
                 print("bg2_sim_loss:", losses[8].item())
                 print("comp2_sim_loss:", losses[9].item() / 2)
+                print("be_loss:", losses[10].item())
         return bg, bg2, fg, composite, composite2, alpha, total_loss    
         
     def forward(self):
