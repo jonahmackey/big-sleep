@@ -938,16 +938,16 @@ class Imagine(nn.Module):
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                             save_image(grid_image, Path('./grid' + f'{self.seed_suffix}.png'))
                             
-                print("lat_loss1:", losses[0][0])
-                print("cls_loss1:", losses[1][0])
-                print("bg_sim_loss:", losses[2][0])
-                print("lat_loss2:", losses[3][0])
-                print("cls_loss2:", losses[4][0])
-                print("comp_sim_loss:", losses[5][0] / 2)
-                print("lat_loss3:", losses[6][0])
-                print("cls_loss3:", losses[7][0])
-                print("bg2_sim_loss:", losses[8][0])
-                print("comp2_sim_loss:", losses[9][0] / 2)
+                print("lat_loss1:", losses[0].item())
+                print("cls_loss1:", losses[1].item())
+                print("bg_sim_loss:", losses[2].item())
+                print("lat_loss2:", losses[3].item())
+                print("cls_loss2:", losses[4].item())
+                print("comp_sim_loss:", losses[5].item() / 2)
+                print("lat_loss3:", losses[6].item())
+                print("cls_loss3:", losses[7].item())
+                print("bg2_sim_loss:", losses[8].item())
+                print("comp2_sim_loss:", losses[9].item() / 2)
         return bg, bg2, fg, composite, composite2, alpha, total_loss    
         
     def forward(self):
