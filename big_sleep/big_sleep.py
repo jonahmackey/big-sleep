@@ -252,20 +252,19 @@ class Model(nn.Module):
         self.class_temperature = class_temperature
         self.ema_decay = ema_decay
         self.alpha_settings = alpha_settings
+        self.fixed_alpha = fixed_alpha
         
-        if fixed_alpha is None:
+        if self.fixed_alpha is None:
             self.alpha = Alpha(
-                size = alpha_settings['size'],
-                grid_range = alpha_settings['grid_range'],
-                num_layers = alpha_settings['num_layers'],
-                layer_width = alpha_settings['layer_width'],
-                order = alpha_settings['order'],
-                pass_radius = alpha_settings['pass_radius']
+                size = self.alpha_settings['size'],
+                grid_range = self.alpha_settings['grid_range'],
+                num_layers = self.alpha_settings['num_layers'],
+                layer_width = self.alpha_settings['layer_width'],
+                order = self.alpha_settings['order'],
+                pass_radius = self.alpha_settings['pass_radius']
             ).cuda()
-            self.fixed_alpha = False
         else:
-            self.alpha = fixed_alpha.cuda()
-            self.fixed_alpha = True
+            self.alpha = None
 
         self.init_latents()
     
@@ -303,10 +302,10 @@ class Model(nn.Module):
         fg = self.biggan(*self.latents2(), 1)
         bg2 = self.biggan(*self.latents3(), 1)
         
-        if not self.fixed_alpha:
+        if self.fixed_alpha is None:
             alpha = self.alpha()[0]
         else:
-            alpha = self.alpha
+            alpha = self.fixed_alpha
             
         composite = (1 - alpha) * bg + alpha * fg
         composite2 = (1 - alpha) * bg2 + alpha * fg
@@ -499,8 +498,11 @@ class BigSleep(nn.Module):
         comp2_sim_loss = sum(results4) / len(results4)
         
         # binary entropy loss:
-#         be_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
-#         be_loss = self.model.alpha_settings['be_weight'] * (be_loss.sum() / (self.image_size ** 2))
+        # if self.fixed_alpha is None:
+#           be_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
+#           be_loss = self.model.alpha_settings['be_weight'] * (be_loss.sum() / (self.image_size ** 2))
+        # else:
+        # be_loss = 0
         
         return bg, bg2, fg, composite, composite2, alpha, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss) #, be_loss)
 
@@ -539,7 +541,7 @@ class Imagine(nn.Module):
         num_cutouts = 128,
         center_bias = False,
         save_dir = None,
-        save_grid = False,
+        save_grid = False
     ):
         super().__init__()
 
@@ -579,9 +581,8 @@ class Imagine(nn.Module):
         if (bg_text2 is not None and bg_text2 != "") and (comp_text2 is not None and comp_text2 != ""):
             self.multiple = True
         
-        self.fixed_alpha = False
-        if fixed_alpha is not None:
-            self.fixed_alpha = True
+        self.fixed_alpha = fixed_alpha
+        self.alpha_settings = alpha_settings
         
         grouped_params = []
         if self.multiple:
@@ -597,7 +598,7 @@ class Imagine(nn.Module):
             }
             grouped_params.append(latent_params)
             
-        if fixed_alpha is None:
+        if self.fixed_alpha is None:
             alpha_params = {
                 'params': model.model.alpha.parameters(),
                 'lr': alpha_settings['lr']
@@ -642,13 +643,13 @@ class Imagine(nn.Module):
         
         if self.save_dir is not None:
             self.fg_filename = Path(f'./{self.save_dir}/' + 'fg' + f'{self.seed_suffix}.png')
-            if fixed_alpha is None:
+            if self.fixed_alpha is None:
                 self.alpha_filename = Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png')
             if self.save_grid:
                 self.grid_filename = Path(f'./{self.save_dir}/' + 'grid' + f'{self.seed_suffix}.png')      
         else:
             self.fg_filename = Path(f'./' + 'fg' + f'{self.seed_suffix}.png')
-            if fixed_alpha is None:
+            if self.fixed_alpha is None:
                 self.alpha_filename = Path(f'./' + 'alpha' + f'{self.seed_suffix}.png')
             if self.save_grid:
                 self.grid_filename = Path(f'./' + 'grid' + f'{self.seed_suffix}.png')
@@ -788,10 +789,10 @@ class Imagine(nn.Module):
             }
             grouped_params.append(latent_params)
             
-        if fixed_alpha is None:
+        if self.fixed_alpha is None:
             alpha_params = {
                 'params': model.model.alpha.parameters(),
-                'lr': alpha_settings['lr']
+                'lr': self.alpha_settings['lr']
             }
             grouped_params.append(alpha_params)
             
@@ -809,9 +810,15 @@ class Imagine(nn.Module):
                                                                            comp2_text_embeds=self.encoded_texts["comp_max2"]
                                                                           )
             if self.multiple:
-                loss = sum(losses) / self.gradient_accumulate_every
+                loss = sum(losses[:10])
             else: 
-                loss = sum(losses[:6]) / self.gradient_accumulate_every
+                loss = sum(losses[:6])
+                
+#             if self.fixed_alpha is None:
+#                 loss += losses[-1]
+                
+            loss = loss / self.gradient_accumulate_every
+            
             total_loss += loss
             loss.backward()
 
@@ -850,7 +857,7 @@ class Imagine(nn.Module):
                     grid_image = torch.cat((grid_image, torch.unsqueeze(bg2_image, dim=0), torch.unsqueeze(comp_image, dim=0), torch.unsqueeze(comp2_image, dim=0), torch.unsqueeze(fg_image, dim=0)), dim=0)
                 else:
                     grid_image = torch.cat((grid_image, torch.unsqueeze(comp_image, dim=0), torch.unsqueeze(fg_image, dim=0)), dim=0)
-                if not self.fixed_alpha:
+                if self.fixed_alpha is None:
                     # alpha shape = 1x512x512
                     alpha_fix_dim = torch.cat((alpha_image, alpha_image, alpha_image), dim=0) # alpha shape = 3x512x512
                     alpha_fix_dim = torch.unsqueeze(alpha_fix_dim, dim=0) # alpha shape = 1x3x512x512
@@ -867,7 +874,7 @@ class Imagine(nn.Module):
                 if self.multiple:
                     save_image(bg2_image, str(self.bg2_filename))
                     save_image(comp2_image, str(self.comp2_filename))
-                if not self.fixed_alpha:
+                if self.fixed_alpha is None:
                     save_image(alpha_image, str(self.alpha_filename))
                     
                 if self.save_grid: 
@@ -896,7 +903,7 @@ class Imagine(nn.Module):
                         if self.multiple:
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
-                        if not self.fixed_alpha:
+                        if self.fixed_alpha is None:
                             save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num}{self.seed_suffix}.png'))
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
@@ -908,7 +915,7 @@ class Imagine(nn.Module):
                         if self.multiple:
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
-                        if not self.fixed_alpha:
+                        if self.fixed_alpha is None:
                             save_image(alpha_image, Path('./alpha' + f'.{num}{self.seed_suffix}.png'))
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
@@ -924,7 +931,7 @@ class Imagine(nn.Module):
                         if self.multiple:
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}{self.seed_suffix}.png'))
-                        if not self.fixed_alpha:
+                        if self.fixed_alpha is None:
                             save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png'))
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
@@ -937,7 +944,7 @@ class Imagine(nn.Module):
                         if self.multiple:
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.comp2_text_path}{self.seed_suffix}.png'))
-                        if not self.fixed_alpha:
+                        if self.fixed_alpha is None:
                             save_image(alpha_image, Path('./alpha' + f'{self.seed_suffix}.png'))
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
