@@ -499,10 +499,10 @@ class BigSleep(nn.Module):
         comp2_sim_loss = sum(results4) / len(results4)
         
         # binary entropy loss:
-        be_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
-        be_loss = self.model.alpha_settings['be_weight'] * (be_loss.sum() / (self.image_size ** 2))
+#         be_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
+#         be_loss = self.model.alpha_settings['be_weight'] * (be_loss.sum() / (self.image_size ** 2))
         
-        return bg, bg2, fg, composite, composite2, alpha, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss, be_loss)
+        return bg, bg2, fg, composite, composite2, alpha, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss) #, be_loss)
 
 class Imagine(nn.Module):
     def __init__(
