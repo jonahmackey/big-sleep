@@ -640,7 +640,7 @@ class Imagine(nn.Module):
             if fixed_alpha is None:
                 self.alpha_filename = Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png')
             if self.save_grid:
-                self.grid_filename = Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png')      
+                self.grid_filename = Path(f'./{self.save_dir}/' + 'grid' + f'{self.seed_suffix}.png')      
         else:
             self.fg_filename = Path(f'./' + 'fg' + f'{self.seed_suffix}.png')
             if fixed_alpha is None:
