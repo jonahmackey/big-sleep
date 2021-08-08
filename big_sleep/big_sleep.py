@@ -154,7 +154,7 @@ class Alpha(torch.nn.Module):
     self.order = order
     self.pass_radius = pass_radius
 
-    self.make_grid()
+    self.input_grid = self.make_grid()
 
     # TO-DO: make larger amount of hidden layers
     layers = []
@@ -194,6 +194,7 @@ class Alpha(torch.nn.Module):
     if self.pass_radius:
       r = x**2 + y**2
       r = torch.unsqueeze(torch.unsqueeze(r, 0), 0)
+      r = torch.sqrt(r)
       grid = torch.cat([grid, r], dim=1)
 
     # concatenate higher power grids
@@ -204,8 +205,7 @@ class Alpha(torch.nn.Module):
       grid2 = torch.stack([x2, y2], dim=0).unsqueeze(0)
       grid = torch.cat([grid, grid2], dim=1)
 
-    self.input_grid = grid.cuda()
-    
+    return torch.nn.parameter.Parameter(grid, requires_grad=False)
     
 #######    
 
@@ -260,7 +260,7 @@ class Model(nn.Module):
                 layer_width = alpha_settings['layer_width'],
                 order = alpha_settings['order'],
                 pass_radius = alpha_settings['pass_radius']
-            )
+            ).cuda()
             self.fixed_alpha = False
         else:
             self.alpha = fixed_alpha.cuda()
@@ -303,17 +303,15 @@ class Model(nn.Module):
         bg2 = self.biggan(*self.latents3(), 1)
         
         if not self.fixed_alpha:
-            alpha = self.alpha()[0].cuda()
-            composite = (1 - alpha) * bg + alpha * fg
-            composite2 = (1 - alpha) * bg2 + alpha * fg
-            
-            return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2, alpha
-        
+            alpha = self.alpha()[0]
         else:
-            composite = (1 - self.alpha) * bg + self.alpha * fg
-            composite2 = (1 - self.alpha) * bg2 + self.alpha * fg
+            alpha = self.alpha
+            
+        composite = (1 - alpha) * bg + alpha * fg
+        composite2 = (1 - alpha) * bg2 + alpha * fg
+
+        return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2, alpha
         
-            return (bg + 1) / 2, (bg2 + 1) / 2, (fg + 1) / 2, (composite + 1) / 2 , (composite2 + 1) / 2, self.alpha
       
         
 class BigSleep(nn.Module):
@@ -535,7 +533,8 @@ class Imagine(nn.Module):
         ema_decay = 0.99,
         num_cutouts = 128,
         center_bias = False,
-        save_dir = None
+        save_dir = None,
+        save_grid = False
     ):
         super().__init__()
 
@@ -606,6 +605,7 @@ class Imagine(nn.Module):
         self.gradient_accumulate_every = gradient_accumulate_every
         self.save_every = save_every
         self.save_dir = save_dir
+        self.save_grid = save_grid
 
         self.save_progress = save_progress
         self.save_date_time = save_date_time
@@ -639,10 +639,14 @@ class Imagine(nn.Module):
             self.fg_filename = Path(f'./{self.save_dir}/' + 'fg' + f'{self.seed_suffix}.png')
             if fixed_alpha is None:
                 self.alpha_filename = Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png')
+            if self.save_grid:
+                self.grid_filename = Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png')      
         else:
             self.fg_filename = Path(f'./' + 'fg' + f'{self.seed_suffix}.png')
             if fixed_alpha is None:
                 self.alpha_filename = Path(f'./' + 'alpha' + f'{self.seed_suffix}.png')
+            if self.save_grid:
+                self.grid_filename = Path(f'./' + 'grid' + f'{self.seed_suffix}.png')
 
         self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_ind = "bg")
         self.set_clip_encoding(text=comp_text, text_min=comp_text_min, text_ind = "comp")
@@ -650,6 +654,7 @@ class Imagine(nn.Module):
         if self.multiple:
             self.set_clip_encoding(text=bg_text2, text_ind = "bg2")
             self.set_clip_encoding(text=comp_text2, text_ind = "comp2")
+            
         
     @property
     def seed_suffix(self):
@@ -832,6 +837,20 @@ class Imagine(nn.Module):
                 comp2_image = composite2[0].cpu()
                 alpha_image = alpha.cpu()
                 
+                # concatenate images together along mini-batch dimension:
+                # each image has shape 3x512x512, alpha has shape 1x512x512
+                # want to make each image have shape 1x3x512x512 and concatenate along batch dim (dim=0)
+                grid_image = torch.unsqueeze(bg_image, dim=0)
+                if self.multiple:
+                    grid_image = torch.cat((grid_image, torch.unsqueeze(bg2_image, dim=0), torch.unsqueeze(comp_image, dim=0), torch.unsqueeze(comp2_image, dim=0), torch.unsqueeze(fg_image, dim=0)), dim=0)
+                else:
+                    grid_image = torch.cat((grid_image, torch.unsqueeze(comp_image, dim=0), torch.unsqueeze(fg_image, dim=0)), dim=0)
+                if not self.fixed_alpha:
+                    # alpha shape = 1x512x512
+                    alpha_fix_dim = torch.cat((alpha_image, alpha_image, alpha_image), dim=0) # alpha shape = 3x512x512
+                    alpha_fix_dim = torch.unsqueeze(alpha_fix_dim, dim=0) # alpha shape = 1x3x512x512
+                    grid_image = torch.cat((grid_image, alpha_fix_dim), dim=0)
+                
                 self.model.model.latents1.train()
                 self.model.model.latents2.train()
                 if self.multiple:
@@ -844,7 +863,12 @@ class Imagine(nn.Module):
                     save_image(bg2_image, str(self.bg2_filename))
                     save_image(comp2_image, str(self.comp2_filename))
                 if not self.fixed_alpha:
-                    save_image(alpha_image, str(self.alpha_filename), normalize=True)
+                    save_image(alpha_image, str(self.alpha_filename))
+                    
+                if self.save_grid: 
+                    # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                    save_image(grid_image, str(self.grid_filename))
+                    
                 
                 if pbar is not None:
                     pbar.update(1)
@@ -868,8 +892,10 @@ class Imagine(nn.Module):
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
                         if not self.fixed_alpha:
-                            save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num}{self.seed_suffix}.png'), normalize=True)
-                        
+                            save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num}{self.seed_suffix}.png'))
+                        if self.save_grid: 
+                            # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                            save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'.{num}{self.seed_suffix}.png'))
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num}{self.seed_suffix}.png'))
                         save_image(fg_image, Path('./fg' + f'.{num}{self.seed_suffix}.png'))
@@ -878,7 +904,10 @@ class Imagine(nn.Module):
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
                         if not self.fixed_alpha:
-                            save_image(alpha_image, Path('./alpha' + f'.{num}{self.seed_suffix}.png'), normalize=True)
+                            save_image(alpha_image, Path('./alpha' + f'.{num}{self.seed_suffix}.png'))
+                        if self.save_grid: 
+                            # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                            save_image(grid_image, Path('./grid' + f'.{num}{self.seed_suffix}.png'))
                 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
@@ -891,7 +920,10 @@ class Imagine(nn.Module):
                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}{self.seed_suffix}.png'))
                         if not self.fixed_alpha:
-                            save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png'), normalize=True)
+                            save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png'))
+                        if self.save_grid: 
+                            # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                            save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'{self.seed_suffix}.png'))
                         
                     else:
                         save_image(bg_image, Path(f'./{self.bg_text_path}{self.seed_suffix}.png'))
@@ -901,7 +933,10 @@ class Imagine(nn.Module):
                             save_image(bg2_image, Path(f'./{self.bg2_text_path}{self.seed_suffix}.png'))
                             save_image(comp2_image, Path(f'./{self.comp2_text_path}{self.seed_suffix}.png'))
                         if not self.fixed_alpha:
-                            save_image(alpha_image, Path('./alpha' + f'{self.seed_suffix}.png'), normalize=True)
+                            save_image(alpha_image, Path('./alpha' + f'{self.seed_suffix}.png'))
+                        if self.save_grid: 
+                            # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                            save_image(grid_image, Path('./grid' + f'{self.seed_suffix}.png'))
                 
         return bg, bg2, fg, composite, composite2, alpha, total_loss    
         
