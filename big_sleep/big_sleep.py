@@ -927,7 +927,7 @@ class Imagine(nn.Module):
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
     
-#                     if self.save_dir is not None:
+                    if self.save_dir is not None:
 #                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}{self.seed_suffix}.png'))
 #                         save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'{self.seed_suffix}.png'))
 #                         save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}{self.seed_suffix}.png'))
