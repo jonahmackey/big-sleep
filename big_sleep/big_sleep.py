@@ -500,14 +500,14 @@ class BigSleep(nn.Module):
         comp2_sim_loss = sum(results4) / len(results4)
         
         # binary entropy loss:
-#         if self.fixed_alpha is None:
-# # #           mask_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
-#             mask_loss = -4 * (alpha - 0.5) ** 2 + 1
-#             mask_loss = self.alpha_settings['loss_weight'] * (mask_loss.sum() / (self.image_size ** 2))
-#         else:
-#             mask_loss = 0
+        if self.fixed_alpha is None:
+#             mask_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
+            mask_loss = -4 * (alpha - 0.5) ** 2 + 1
+            mask_loss = self.alpha_settings['loss_weight'] * (mask_loss.sum() / (self.image_size ** 2))
+        else:
+            mask_loss = 0
         
-        return bg, bg2, fg, composite, composite2, alpha, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss) #, mask_loss)
+        return bg, bg2, fg, composite, composite2, alpha, (lat_loss1, cls_loss1, bg_sim_loss, lat_loss2, cls_loss2, 2 * comp_sim_loss, lat_loss3, cls_loss3, bg2_sim_loss, 2 * comp2_sim_loss, mask_loss)
 
 class Imagine(nn.Module):
     def __init__(
@@ -871,14 +871,14 @@ class Imagine(nn.Module):
                 if self.multiple:
                     self.model.model.latents3.train()
 
-                save_image(bg_image, str(self.bg_filename))
-                save_image(fg_image, str(self.fg_filename))
-                save_image(comp_image, str(self.comp_filename))
-                if self.multiple:
-                    save_image(bg2_image, str(self.bg2_filename))
-                    save_image(comp2_image, str(self.comp2_filename))
-                if self.fixed_alpha is None:
-                    save_image(alpha_image, str(self.alpha_filename))
+#                 save_image(bg_image, str(self.bg_filename))
+#                 save_image(fg_image, str(self.fg_filename))
+#                 save_image(comp_image, str(self.comp_filename))
+#                 if self.multiple:
+#                     save_image(bg2_image, str(self.bg2_filename))
+#                     save_image(comp2_image, str(self.comp2_filename))
+#                 if self.fixed_alpha is None:
+#                     save_image(alpha_image, str(self.alpha_filename))
                     
                 if self.save_grid: 
                     # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
