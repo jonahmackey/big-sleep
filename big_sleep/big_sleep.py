@@ -817,8 +817,8 @@ class Imagine(nn.Module):
             else: 
                 loss = sum(losses[:6])
                 
-#             if self.fixed_alpha is None:
-#                 loss += losses[-1]
+            if self.fixed_alpha is None:
+                loss += losses[-1]
                 
             loss = loss / self.gradient_accumulate_every
             
@@ -963,7 +963,7 @@ class Imagine(nn.Module):
                 print("cls_loss3:", losses[7].item())
                 print("bg2_sim_loss:", losses[8].item())
                 print("comp2_sim_loss:", losses[9].item() / 2)
-#                 print("mask_loss:", losses[10].item())
+                print("mask_loss:", losses[10].item())
         return bg, bg2, fg, composite, composite2, alpha, total_loss    
         
     def forward(self):
