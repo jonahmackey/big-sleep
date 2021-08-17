@@ -499,7 +499,7 @@ class BigSleep(nn.Module):
         bg2_sim_loss = sum(results3) / len(results3)
         comp2_sim_loss = sum(results4) / len(results4)
         
-        # binary entropy loss:
+        # mask loss:
         if self.fixed_alpha is None:
 #             mask_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
             mask_loss = -4 * (alpha - 0.5) ** 2 + 1
