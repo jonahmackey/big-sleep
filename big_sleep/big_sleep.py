@@ -262,7 +262,7 @@ class Model(nn.Module):
                 layer_width = self.alpha_settings['layer_width'],
                 order = self.alpha_settings['order'],
                 pass_radius = self.alpha_settings['pass_radius']
-            ).cuda()
+            )
         else:
             self.alpha = None
 
