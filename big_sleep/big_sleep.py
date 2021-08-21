@@ -255,7 +255,7 @@ class Model(nn.Module):
         self.fixed_alpha = fixed_alpha
         
         if self.fixed_alpha is None:
-            self.alpha = Alpha(
+            alpha = Alpha(
                 size = self.alpha_settings['size'],
                 grid_range = self.alpha_settings['grid_range'],
                 num_layers = self.alpha_settings['num_layers'],
@@ -263,6 +263,9 @@ class Model(nn.Module):
                 order = self.alpha_settings['order'],
                 pass_radius = self.alpha_settings['pass_radius']
             )
+            if self.alpha_settings['circle_init']:
+                alpha.load_state_dict(torch.load(f'./alpha_params/alpha{self.alpha_settings['num_layers']}x{self.alpha_settings['layer_width']}_circle.pth'))
+            self.alpha = alpha
         else:
             self.alpha = None
 
