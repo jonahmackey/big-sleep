@@ -264,7 +264,7 @@ class Model(nn.Module):
                 pass_radius = self.alpha_settings['pass_radius']
             )
             if self.alpha_settings['circle_init']:
-                alpha.load_state_dict(torch.load('big_sleep/alpha_params/alpha8x24_circle.pth')) 
+                alpha.load_state_dict(torch.load(f'/big_sleep/alpha_params/alpha{alpha.num_layers}x{alpha.layer_width}_circle.pth')) 
             self.alpha = alpha
         else:
             self.alpha = None
