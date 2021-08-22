@@ -20,6 +20,7 @@ from tqdm import tqdm, trange
 from collections import OrderedDict
 
 from big_sleep.ema import EMA
+from big_sleep.alpha import Alpha
 from big_sleep.resample import resample
 from big_sleep.biggan import BigGAN
 from big_sleep.clip import load, tokenize
@@ -135,80 +136,6 @@ def rand_cutout(image, size, center_bias=False, center_focus=2):
 
 perceptor, normalize_image = load('ViT-B/32', jit = False)
 
-#######
-class Alpha(torch.nn.Module):
-  def __init__(
-      self,
-      grid_range=1,
-      size=512,
-      num_layers=8,
-      layer_width=24,
-      order=2,
-      pass_radius=False
-  ):
-    super().__init__()
-    self.grid_range = grid_range
-    self.size = size
-    self.num_layers = num_layers
-    self.layer_width = layer_width
-    self.order = order
-    self.pass_radius = pass_radius
-
-    self.input_grid = self.make_grid()
-
-    # TO-DO: make larger amount of hidden layers
-    layers = []
-
-    for i in range(num_layers):
-      in_channels = layer_width
-      out_channels = layer_width
-
-      if i == 0:
-        in_channels = 2 * order
-        if pass_radius:
-          in_channels += 1
-      if i == num_layers - 1:
-        out_channels = 1
-      
-      layers.append((f'conv{i}', torch.nn.Conv2d(in_channels, out_channels, kernel_size=1)))
-      
-      if i < num_layers - 1:
-        layers.append((f'relu{i}', torch.nn.ReLU()))
-
-    layers.append(('sigmoid', torch.nn.Sigmoid()))
-
-    self.network = torch.nn.Sequential(OrderedDict(layers))
-  
-  def forward(self):
-    mask = self.network(self.input_grid)
-
-    return mask
-
-  def make_grid(self):
-    coord_range = torch.linspace(-self.grid_range, self.grid_range, self.size)
-    x = coord_range.view(-1, 1).repeat(1, coord_range.size(0))
-    y = coord_range.view(1, -1).repeat(coord_range.size(0), 1)
-
-    grid = torch.stack([x, y], dim=0).unsqueeze(0)
-
-    if self.pass_radius:
-      r = x**2 + y**2
-      r = torch.unsqueeze(torch.unsqueeze(r, 0), 0)
-      r = torch.sqrt(r)
-      grid = torch.cat([grid, r], dim=1)
-
-    # concatenate higher power grids
-    for p in range(2, self.order + 1):
-      x2 = x**p
-      y2 = y**p
-
-      grid2 = torch.stack([x2, y2], dim=0).unsqueeze(0)
-      grid = torch.cat([grid, grid2], dim=1)
-
-    return torch.nn.parameter.Parameter(grid, requires_grad=False)
-    
-#######    
-
 class Latents(torch.nn.Module):
     def __init__(
         self,
@@ -261,7 +188,9 @@ class Model(nn.Module):
                 num_layers = self.alpha_settings['num_layers'],
                 layer_width = self.alpha_settings['layer_width'],
                 order = self.alpha_settings['order'],
-                pass_radius = self.alpha_settings['pass_radius']
+                pass_radius = self.alpha_settings['pass_radius'],
+                add_dropout = self.alpha_settings['add_dropout'],
+                p_dropout = self.alpha_settings['p_dropout']
             )
             if self.alpha_settings['circle_init']:
                 alpha.load_state_dict(torch.load(f'./drive/MyDrive/bigsleep/alpha_params/alpha{alpha.num_layers}x{alpha.layer_width}_circle.pth')) 
@@ -589,6 +518,7 @@ class Imagine(nn.Module):
         
         self.fixed_alpha = fixed_alpha
         self.alpha_settings = alpha_settings
+        self.alpha_dropout = alpha_settings['add_dropout']
         
         grouped_params = []
         if self.multiple:
