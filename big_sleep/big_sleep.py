@@ -771,6 +771,8 @@ class Imagine(nn.Module):
                 self.model.model.latents1.eval()
                 self.model.model.latents2.eval()
                 self.model.model.latents3.eval()
+#                 if self.fixed_alpha is None:
+#                     self.model.model.alpha.eval()
                 bg, bg2, fg, composite, composite2, alpha, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
                                                                                comp_text_embeds=self.encoded_texts["comp_max"],
                                                                                bg_text_min_embeds=self.encoded_texts["bg_min"],
