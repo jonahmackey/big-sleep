@@ -803,8 +803,9 @@ class Imagine(nn.Module):
                 
                 self.model.model.latents1.train()
                 self.model.model.latents2.train()
-                if self.multiple:
-                    self.model.model.latents3.train()
+                self.model.model.latents3.train()
+                if self.fixed_alpha is None:
+                    self.model.model.alpha.train()
 
 #                 save_image(bg_image, str(self.bg_filename))
 #                 save_image(fg_image, str(self.fg_filename))
