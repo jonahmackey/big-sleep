@@ -768,6 +768,10 @@ class Imagine(nn.Module):
 
         if (i + 1) % self.save_every == 0:
             with torch.no_grad():
+                if self.alpha_dropout:
+                    alpha_drop = self.model.model.alpha()
+                    alpha_drop_image = alpha_drop.cpu()
+                
                 self.model.model.latents1.eval()
                 self.model.model.latents2.eval()
                 self.model.model.latents3.eval()
@@ -806,7 +810,6 @@ class Imagine(nn.Module):
                 self.model.model.latents3.train()
                 if self.fixed_alpha is None:
                     self.model.model.alpha.train()
-
 #                 save_image(bg_image, str(self.bg_filename))
 #                 save_image(fg_image, str(self.fg_filename))
 #                 save_image(comp_image, str(self.comp_filename))
@@ -815,7 +818,9 @@ class Imagine(nn.Module):
 #                     save_image(comp2_image, str(self.comp2_filename))
 #                 if self.fixed_alpha is None:
 #                     save_image(alpha_image, str(self.alpha_filename))
-                    
+                if self.alpha_dropout:
+                    save_image(alpha_drop_image, 'alpha_dropout.png')
+    
                 if self.save_grid: 
                     # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                     save_image(grid_image, str(self.grid_filename))
@@ -847,6 +852,8 @@ class Imagine(nn.Module):
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                             save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'.{num}{self.seed_suffix}.png'))
+                        if self.alpha_dropout:
+                            save_image(alpha_drop_image, Path(f'./{self.save_dir}/' + 'alpha_dropout' + f'.{num}{self.seed_suffix}.png'))
                     else:
 #                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num}{self.seed_suffix}.png'))
 #                         save_image(fg_image, Path('./fg' + f'.{num}{self.seed_suffix}.png'))
@@ -859,6 +866,8 @@ class Imagine(nn.Module):
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                             save_image(grid_image, Path('./grid' + f'.{num}{self.seed_suffix}.png'))
+                        if self.alpha_dropout:
+                            save_image(alpha_drop_image, Path('./alpha_dropout' + f'.{num}{self.seed_suffix}.png'))
                 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
