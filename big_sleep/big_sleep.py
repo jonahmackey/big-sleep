@@ -819,7 +819,7 @@ class Imagine(nn.Module):
 #                 if self.fixed_alpha is None:
 #                     save_image(alpha_image, str(self.alpha_filename))
                 if self.alpha_dropout:
-                    save_image(alpha_drop_image, 'alpha_dropout.png')
+                    save_image(alpha_drop_image, f'./{save_dir}/alpha_dropout.png')
     
                 if self.save_grid: 
                     # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
