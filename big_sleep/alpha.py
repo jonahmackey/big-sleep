@@ -46,7 +46,7 @@ class Alpha(nn.Module):
         if i < num_layers - 1:
           layers.append((f'relu{i}', nn.ReLU()))
           if add_dropout:
-            layers.append((f'dropout{i}', nn.Dropout(p=p_dropout)))
+            layers.append((f'dropout{i}', nn.Dropout2d(p=p_dropout)))
 
       layers.append(('sigmoid', nn.Sigmoid()))
 
