@@ -482,9 +482,9 @@ class Imagine(nn.Module):
                     num = total_iterations // self.save_every
 
                     if self.save_dir is not None:
-                        save_image(image, Path(f'./{self.save_dir}/{self.text_path}.{num}{self.seed_suffix}.png'))
+                        save_image(image, Path(f'./{self.save_dir}/{self.text_path}.{num:03d}{self.seed_suffix}.png'))
                     else:
-                        save_image(image, Path(f'./{self.text_path}.{num}{self.seed_suffix}.png'))
+                        save_image(image, Path(f'./{self.text_path}.{num:03d}{self.seed_suffix}.png'))
 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
