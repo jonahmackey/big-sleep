@@ -769,8 +769,8 @@ class Imagine(nn.Module):
         if (i + 1) % self.save_every == 0:
             with torch.no_grad():
                 if self.alpha_dropout:
-                    alpha_drop = self.model.model.alpha()
-                    alpha_drop_image = alpha_drop.cpu()
+                    alpha_w_dropout = self.model.model.alpha()
+                    alpha_w_dropout_image = alpha_drop.cpu()
                 
                 self.model.model.latents1.eval()
                 self.model.model.latents2.eval()
@@ -819,7 +819,7 @@ class Imagine(nn.Module):
 #                 if self.fixed_alpha is None:
 #                     save_image(alpha_image, str(self.alpha_filename))
                 if self.alpha_dropout:
-                    save_image(alpha_drop_image, f'./{self.save_dir}/alpha_dropout.png')
+                    save_image(alpha_w_dropout_image, f'./{self.save_dir}/alpha_dropout.png')
     
                 if self.save_grid: 
                     # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
@@ -841,33 +841,33 @@ class Imagine(nn.Module):
                     num = total_iterations // self.save_every
     
                     if self.save_dir is not None:
-#                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}.{num}{self.seed_suffix}.png'))
-#                         save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'.{num}{self.seed_suffix}.png'))
-#                         save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}.{num}{self.seed_suffix}.png'))
+#                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}.{num:03d}{self.seed_suffix}.png'))
+#                         save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'.{num:03d}{self.seed_suffix}.png'))
+#                         save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}.{num:03d}{self.seed_suffix}.png'))
 #                         if self.multiple:
-#                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
-#                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
+#                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num:03d}{self.seed_suffix}.png'))
+#                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num:03d}{self.seed_suffix}.png'))
 #                         if self.fixed_alpha is None:
-#                             save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num}{self.seed_suffix}.png'))
+#                             save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num:03d}{self.seed_suffix}.png'))
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
-                            save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'.{num}{self.seed_suffix}.png'))
+                            save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'.{num:03d}{self.seed_suffix}.png'))
                         if self.alpha_dropout:
-                            save_image(alpha_drop_image, Path(f'./{self.save_dir}/' + 'alpha_dropout' + f'.{num}{self.seed_suffix}.png'))
+                            save_image(alpha_w_dropout_image, Path(f'./{self.save_dir}/' + 'alpha_dropout' + f'.{num:03d}{self.seed_suffix}.png'))
                     else:
-#                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num}{self.seed_suffix}.png'))
-#                         save_image(fg_image, Path('./fg' + f'.{num}{self.seed_suffix}.png'))
-#                         save_image(comp_image, Path(f'./{self.comp_text_path}.{num}{self.seed_suffix}.png'))
+#                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num:03d}{self.seed_suffix}.png'))
+#                         save_image(fg_image, Path('./fg' + f'.{num:03d}{self.seed_suffix}.png'))
+#                         save_image(comp_image, Path(f'./{self.comp_text_path}.{num:03d}{self.seed_suffix}.png'))
 #                         if self.multiple:
-#                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num}{self.seed_suffix}.png'))
-#                             save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num}{self.seed_suffix}.png'))
+#                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num:03d}{self.seed_suffix}.png'))
+#                             save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num:03d}{self.seed_suffix}.png'))
 #                         if self.fixed_alpha is None:
-#                             save_image(alpha_image, Path('./alpha' + f'.{num}{self.seed_suffix}.png'))
+#                             save_image(alpha_image, Path('./alpha' + f'.{num:03d}{self.seed_suffix}.png'))
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
-                            save_image(grid_image, Path('./grid' + f'.{num}{self.seed_suffix}.png'))
+                            save_image(grid_image, Path('./grid' + f'.{num:03d}{self.seed_suffix}.png'))
                         if self.alpha_dropout:
-                            save_image(alpha_drop_image, Path('./alpha_dropout' + f'.{num}{self.seed_suffix}.png'))
+                            save_image(alpha_w_dropout_image, Path('./alpha_dropout' + f'.{num:03d}{self.seed_suffix}.png'))
                 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
