@@ -193,7 +193,14 @@ class Model(nn.Module):
                 p_dropout = self.alpha_settings['p_dropout']
             )
             if self.alpha_settings['circle_init']:
-                alpha.load_state_dict(torch.load(f'./drive/MyDrive/bigsleep/alpha_params/alpha{alpha.num_layers}x{alpha.layer_width}_circle.pth')) 
+                current_state = alpha.state_dict()
+                circle_state = torch.load(torch.load(f'./drive/MyDrive/bigsleep/alpha_params/alpha{alpha.num_layers}x{alpha.layer_width}_circle.pth'))
+                new_state = OrderedDict()
+                
+                for key in current_state:
+                  new_state[key] = (1-self.alpha_settings['circle_amount']) * current_state[key] + self.alpha_settings['circle_amount'] * circle_state[key]
+                
+                alpha.load_state_dict(new_state) 
             self.alpha = alpha
         else:
             self.alpha = None
