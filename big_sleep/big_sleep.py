@@ -198,7 +198,8 @@ class Model(nn.Module):
                 new_state = OrderedDict()
                 
                 for layer in current_state:
-                  new_state[layer] = current_state[layer] + self.alpha_settings['circle_coeff'] * circle_state[layer]
+                    k = self.alpha_settings['circle_coeff']
+                    new_state[layer] = (1 - k) * current_state[layer] + k * circle_state[layer]
                 
                 alpha.load_state_dict(new_state) 
             self.alpha = alpha
