@@ -554,7 +554,7 @@ class Imagine(nn.Module):
             
         self.optimizer = Adam(grouped_params)
         
-        self.mask_optimizer = Adam(alpha_params)
+        self.mask_optimizer = Adam(params=alpha_params['params'], lr=alpha_params['lr'])
         
         self.gradient_accumulate_every = gradient_accumulate_every
         self.save_every = save_every
@@ -748,7 +748,7 @@ class Imagine(nn.Module):
             grouped_params.append(alpha_params)
             
         self.optimizer = Adam(grouped_params)
-        self.mask_optimizer = Adam(alpha_params)
+        self.mask_optimizer = Adam(params=alpha_params['params'], lr=alpha_params['lr'])
 
     def train_step(self, epoch, i, pbar=None):
         total_loss = 0
