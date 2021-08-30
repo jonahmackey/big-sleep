@@ -841,33 +841,33 @@ class Imagine(nn.Module):
                     num = total_iterations // self.save_every
     
                     if self.save_dir is not None:
-#                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}.{num:03d}{self.seed_suffix}.png'))
-#                         save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'.{num:03d}{self.seed_suffix}.png'))
-#                         save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}.{num:03d}{self.seed_suffix}.png'))
+#                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                         save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'.{num:04d}{self.seed_suffix}.png'))
+#                         save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}.{num:04d}{self.seed_suffix}.png'))
 #                         if self.multiple:
-#                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num:03d}{self.seed_suffix}.png'))
-#                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num:03d}{self.seed_suffix}.png'))
+#                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num:04d}{self.seed_suffix}.png'))
 #                         if self.fixed_alpha is None:
-#                             save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num:03d}{self.seed_suffix}.png'))
+#                             save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num:04d}{self.seed_suffix}.png'))
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
-                            save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'.{num:03d}{self.seed_suffix}.png'))
+                            save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'.{num:04d}{self.seed_suffix}.png'))
                         if self.alpha_dropout:
-                            save_image(alpha_w_dropout_image, Path(f'./{self.save_dir}/' + 'alpha_dropout' + f'.{num:03d}{self.seed_suffix}.png'))
+                            save_image(alpha_w_dropout_image, Path(f'./{self.save_dir}/' + 'alpha_dropout' + f'.{num:04d}{self.seed_suffix}.png'))
                     else:
-#                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num:03d}{self.seed_suffix}.png'))
-#                         save_image(fg_image, Path('./fg' + f'.{num:03d}{self.seed_suffix}.png'))
-#                         save_image(comp_image, Path(f'./{self.comp_text_path}.{num:03d}{self.seed_suffix}.png'))
+#                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                         save_image(fg_image, Path('./fg' + f'.{num:04d}{self.seed_suffix}.png'))
+#                         save_image(comp_image, Path(f'./{self.comp_text_path}.{num:04d}{self.seed_suffix}.png'))
 #                         if self.multiple:
-#                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num:03d}{self.seed_suffix}.png'))
-#                             save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num:03d}{self.seed_suffix}.png'))
+#                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                             save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num:04d}{self.seed_suffix}.png'))
 #                         if self.fixed_alpha is None:
-#                             save_image(alpha_image, Path('./alpha' + f'.{num:03d}{self.seed_suffix}.png'))
+#                             save_image(alpha_image, Path('./alpha' + f'.{num:04d}{self.seed_suffix}.png'))
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
-                            save_image(grid_image, Path('./grid' + f'.{num:03d}{self.seed_suffix}.png'))
+                            save_image(grid_image, Path('./grid' + f'.{num:04d}{self.seed_suffix}.png'))
                         if self.alpha_dropout:
-                            save_image(alpha_w_dropout_image, Path('./alpha_dropout' + f'.{num:03d}{self.seed_suffix}.png'))
+                            save_image(alpha_w_dropout_image, Path('./alpha_dropout' + f'.{num:04d}{self.seed_suffix}.png'))
                 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
