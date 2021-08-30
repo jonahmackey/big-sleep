@@ -843,7 +843,7 @@ class Imagine(nn.Module):
 #                         print(f'bg2 image updated at "./{str(self.bg2_filename)}"')
 #                         print(f'composite2 image updated at "./{str(self.comp2_filename)}"')
                     if self.save_grid:
-                        self.save_grid(f'grid image updated at "./{str(self.grid_filename)}"')
+                        print(f'grid image updated at "./{str(self.grid_filename)}"')
                 
                 if self.save_progress:
                     total_iterations = epoch * self.iterations + i
