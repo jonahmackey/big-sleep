@@ -786,7 +786,7 @@ class Imagine(nn.Module):
             with torch.no_grad():
                 if self.alpha_dropout:
                     alpha_w_dropout = self.model.model.alpha()
-                    alpha_w_dropout_image = alpha_drop.cpu()
+                    alpha_w_dropout_image = alpha_w_dropout.cpu()
                 
                 self.model.model.latents1.eval()
                 self.model.model.latents2.eval()
