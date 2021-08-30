@@ -466,6 +466,7 @@ class Imagine(nn.Module):
         comp_img=None, 
         comp_img2=None,
         encoding=None,
+        train_mask=False,
         lr = .07,
         image_size = 512,
         gradient_accumulate_every = 1,
@@ -554,6 +555,9 @@ class Imagine(nn.Module):
             
         self.optimizer = Adam(grouped_params)
         
+        self.train_mask = train_mask
+        if self.train_mask:
+            self.mask_optimizer = Adam(alpha_params)
         
         self.gradient_accumulate_every = gradient_accumulate_every
         self.save_every = save_every
@@ -747,6 +751,8 @@ class Imagine(nn.Module):
             grouped_params.append(alpha_params)
             
         self.optimizer = Adam(grouped_params)
+        if self.train_mask:
+            self.mask_optimizer = Adam(alpha_params)
 
     def train_step(self, epoch, i, pbar=None):
         total_loss = 0
@@ -929,7 +935,190 @@ class Imagine(nn.Module):
                 print("bg2_sim_loss:", losses[8].item())
                 print("comp2_sim_loss:", losses[9].item() / 2)
                 print("mask_loss:", losses[10].item())
-        return bg, bg2, fg, composite, composite2, alpha, total_loss    
+        return bg, bg2, fg, composite, composite2, alpha, total_loss
+    
+    def mask_train_step(self, epoch, i, pbar=None):
+        total_loss = 0
+        
+        for _ in range(self.gradient_accumulate_every):
+            bg, bg2, fg, composite, composite2, alpha, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
+                                                                           comp_text_embeds=self.encoded_texts["comp_max"],
+                                                                           bg_text_min_embeds=self.encoded_texts["bg_min"],
+                                                                           comp_text_min_embeds=self.encoded_texts["comp_min"],
+                                                                           bg2_text_embeds=self.encoded_texts["bg_max2"],
+                                                                           comp2_text_embeds=self.encoded_texts["comp_max2"]
+                                                                          )
+            if self.multiple:
+                loss = sum(losses[:10])
+            else: 
+                loss = sum(losses[:6])
+                
+            if self.fixed_alpha is None:
+                loss += losses[-1]
+                
+            loss = loss / self.gradient_accumulate_every
+            
+            total_loss += loss
+            loss.backward()
+
+        self.mask_optimizer.step()
+        self.model.model.latents1.update()
+        self.model.model.latents2.update()
+        if self.multiple:
+            self.model.model.latents3.update()
+        
+        self.mask_optimizer.zero_grad()
+
+        if i == 0 or (i + 1) % self.save_every == 0:
+            with torch.no_grad():
+                if self.alpha_dropout:
+                    alpha_w_dropout = self.model.model.alpha()
+                    alpha_w_dropout_image = alpha_w_dropout.cpu()
+                
+                self.model.model.latents1.eval()
+                self.model.model.latents2.eval()
+                self.model.model.latents3.eval()
+                if self.fixed_alpha is None:
+                    self.model.model.alpha.eval()
+                bg, bg2, fg, composite, composite2, alpha, losses = self.model(bg_text_embeds=self.encoded_texts["bg_max"], 
+                                                                               comp_text_embeds=self.encoded_texts["comp_max"],
+                                                                               bg_text_min_embeds=self.encoded_texts["bg_min"],
+                                                                               comp_text_min_embeds=self.encoded_texts["comp_min"],
+                                                                               bg2_text_embeds=self.encoded_texts["bg_max2"],
+                                                                               comp2_text_embeds=self.encoded_texts["comp_max2"]
+                                                                              )
+                fg_image = fg[0].cpu()
+                bg_image = bg[0].cpu()
+                comp_image = composite[0].cpu()
+                bg2_image = bg2[0].cpu()
+                comp2_image = composite2[0].cpu()
+                alpha_image = alpha.cpu()
+                
+                # concatenate images together along mini-batch dimension:
+                # each image has shape 3x512x512, alpha has shape 1x512x512
+                # want to make each image have shape 1x3x512x512 and concatenate along batch dim (dim=0)
+                grid_image = torch.unsqueeze(bg_image, dim=0)
+                if self.multiple:
+                    grid_image = torch.cat((grid_image, torch.unsqueeze(bg2_image, dim=0), torch.unsqueeze(comp_image, dim=0), torch.unsqueeze(comp2_image, dim=0), torch.unsqueeze(fg_image, dim=0)), dim=0)
+                else:
+                    grid_image = torch.cat((grid_image, torch.unsqueeze(comp_image, dim=0), torch.unsqueeze(fg_image, dim=0)), dim=0)
+                if self.fixed_alpha is None:
+                    # alpha shape = 1x512x512
+                    alpha_fix_dim = torch.cat((alpha_image, alpha_image, alpha_image), dim=0) # alpha shape = 3x512x512
+                    alpha_fix_dim = torch.unsqueeze(alpha_fix_dim, dim=0) # alpha shape = 1x3x512x512
+                    grid_image = torch.cat((grid_image, alpha_fix_dim), dim=0)
+                
+                self.model.model.latents1.train()
+                self.model.model.latents2.train()
+                self.model.model.latents3.train()
+                if self.fixed_alpha is None:
+                    self.model.model.alpha.train()
+#                 save_image(bg_image, str(self.bg_filename))
+#                 save_image(fg_image, str(self.fg_filename))
+#                 save_image(comp_image, str(self.comp_filename))
+#                 if self.multiple:
+#                     save_image(bg2_image, str(self.bg2_filename))
+#                     save_image(comp2_image, str(self.comp2_filename))
+#                 if self.fixed_alpha is None:
+#                     save_image(alpha_image, str(self.alpha_filename))
+                if self.alpha_dropout:
+                    save_image(alpha_w_dropout_image, f'./{self.save_dir}/alpha_w_dropout.png')
+    
+                if self.save_grid: 
+                    # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                    save_image(grid_image, str(self.grid_filename))
+                    
+                
+                if pbar is not None:
+                    pbar.update(1)
+                else:
+#                     print(f'bg image updated at "./{str(self.bg_filename)}"')
+#                     print(f'fg image updated at "./{str(self.fg_filename)}"')
+#                     print(f'composite image updated at "./{str(self.comp_filename)}"')
+#                     if self.multiple:
+#                         print(f'bg2 image updated at "./{str(self.bg2_filename)}"')
+#                         print(f'composite2 image updated at "./{str(self.comp2_filename)}"')
+                    if self.save_grid:
+                        print(f'grid image updated at "./{str(self.grid_filename)}"')
+                
+                if self.save_progress:
+                    total_iterations = epoch * self.iterations + i
+                    num = total_iterations // self.save_every
+    
+                    if self.save_dir is not None:
+#                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                         save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'.{num:04d}{self.seed_suffix}.png'))
+#                         save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                         if self.multiple:
+#                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                         if self.fixed_alpha is None:
+#                             save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'.{num:04d}{self.seed_suffix}.png'))
+                        if self.save_grid: 
+                            # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                            save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'.{num:04d}{self.seed_suffix}.png'))
+                        if self.alpha_dropout:
+                            save_image(alpha_w_dropout_image, Path(f'./{self.save_dir}/' + 'alpha_w_dropout' + f'.{num:04d}{self.seed_suffix}.png'))
+                    else:
+#                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                         save_image(fg_image, Path('./fg' + f'.{num:04d}{self.seed_suffix}.png'))
+#                         save_image(comp_image, Path(f'./{self.comp_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                         if self.multiple:
+#                             save_image(bg2_image, Path(f'./{self.bg2_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                             save_image(comp2_image, Path(f'./{self.comp2_text_path}.{num:04d}{self.seed_suffix}.png'))
+#                         if self.fixed_alpha is None:
+#                             save_image(alpha_image, Path('./alpha' + f'.{num:04d}{self.seed_suffix}.png'))
+                        if self.save_grid: 
+                            # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                            save_image(grid_image, Path('./grid' + f'.{num:04d}{self.seed_suffix}.png'))
+                        if self.alpha_dropout:
+                            save_image(alpha_w_dropout_image, Path('./alpha_w_dropout' + f'.{num:04d}{self.seed_suffix}.png'))
+                
+                if self.save_best and top_score.item() < self.current_best_score:
+                    self.current_best_score = top_score.item()
+    
+                    if self.save_dir is not None:
+#                         save_image(bg_image, Path(f'./{self.save_dir}/{self.bg_text_path}{self.seed_suffix}.png'))
+#                         save_image(fg_image, Path(f'./{self.save_dir}/' + 'fg' + f'{self.seed_suffix}.png'))
+#                         save_image(comp_image, Path(f'./{self.save_dir}/{self.comp_text_path}{self.seed_suffix}.png'))
+#                         if self.multiple:
+#                             save_image(bg2_image, Path(f'./{self.save_dir}/{self.bg2_text_path}{self.seed_suffix}.png'))
+#                             save_image(comp2_image, Path(f'./{self.save_dir}/{self.comp2_text_path}{self.seed_suffix}.png'))
+#                         if self.fixed_alpha is None:
+#                             save_image(alpha_image, Path(f'./{self.save_dir}/' + 'alpha' + f'{self.seed_suffix}.png'))
+                        if self.save_grid: 
+                            # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                            save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'{self.seed_suffix}.png'))
+                        if self.alpha_dropout:
+                            save_image(alpha_w_dropout_image, Path(f'./{self.save_dir}/' + 'alpha_w_dropout' + f'{self.seed_suffix}.png'))
+                        
+                    else:
+#                         save_image(bg_image, Path(f'./{self.bg_text_path}{self.seed_suffix}.png'))
+#                         save_image(fg_image, Path('./fg' + f'{self.seed_suffix}.png'))
+#                         save_image(comp_image, Path(f'./{self.comp_text_path}{self.seed_suffix}.png'))
+#                         if self.multiple:
+#                             save_image(bg2_image, Path(f'./{self.bg2_text_path}{self.seed_suffix}.png'))
+#                             save_image(comp2_image, Path(f'./{self.comp2_text_path}{self.seed_suffix}.png'))
+#                         if self.fixed_alpha is None:
+#                             save_image(alpha_image, Path('./alpha' + f'{self.seed_suffix}.png'))
+                        if self.save_grid: 
+                            # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
+                            save_image(grid_image, Path('./grid' + f'{self.seed_suffix}.png'))
+                        if self.alpha_dropout:
+                            save_image(alpha_w_dropout_image, Path('./alpha_w_dropout' + f'{self.seed_suffix}.png'))
+                            
+                print("lat_loss1:", losses[0].item())
+                print("cls_loss1:", losses[1].item())
+                print("bg_sim_loss:", losses[2].item())
+                print("lat_loss2:", losses[3].item())
+                print("cls_loss2:", losses[4].item())
+                print("comp_sim_loss:", losses[5].item() / 2)
+                print("lat_loss3:", losses[6].item())
+                print("cls_loss3:", losses[7].item())
+                print("bg2_sim_loss:", losses[8].item())
+                print("comp2_sim_loss:", losses[9].item() / 2)
+                print("mask_loss:", losses[10].item())
+        return bg, bg2, fg, composite, composite2, alpha, total_loss
         
     def forward(self):
         penalizing = ""
