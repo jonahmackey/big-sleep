@@ -194,11 +194,11 @@ class Model(nn.Module):
             )
             if self.alpha_settings['circle_init']:
                 current_state = alpha.state_dict()
-                circle_state = torch.load(f'./drive/MyDrive/bigsleep/alpha_params/alpha{alpha.num_layers}x{alpha.layer_width}_circle.pth')
+                circle_state = torch.load(f=f'./drive/MyDrive/bigsleep/alpha_params/alpha{alpha.num_layers}x{alpha.layer_width}_circle.pth', map_location=torch.device('cpu'))
                 new_state = OrderedDict()
                 
-                for key in current_state:
-                  new_state[key] = (1-self.alpha_settings['circle_amount']) * current_state[key] + self.alpha_settings['circle_amount'] * circle_state[key]
+                for layer in current_state:
+                  new_state[layer] = current_state[layer] + self.alpha_settings['circle_coeff'] * circle_state[layer]
                 
                 alpha.load_state_dict(new_state) 
             self.alpha = alpha
@@ -442,7 +442,7 @@ class BigSleep(nn.Module):
         if self.fixed_alpha is None:
 #             mask_loss = - alpha * torch.log2(alpha) - (1 - alpha) * torch.log2(1-alpha)
             mask_loss = -4 * (alpha - 0.5) ** 2 + 1
-            mask_loss = self.alpha_settings['loss_weight'] * (mask_loss.sum() / (self.image_size ** 2))
+            mask_loss = self.alpha_settings['mask_loss_coeff'] * (mask_loss.sum() / (self.image_size ** 2))
         else:
             mask_loss = 0
         
@@ -544,7 +544,7 @@ class Imagine(nn.Module):
         if self.fixed_alpha is None:
             alpha_params = {
                 'params': model.model.alpha.parameters(),
-                'lr': alpha_settings['lr']
+                'lr': alpha_settings['mask_lr']
             }
             grouped_params.append(alpha_params)
             
@@ -735,7 +735,7 @@ class Imagine(nn.Module):
         if self.fixed_alpha is None:
             alpha_params = {
                 'params': model.model.alpha.parameters(),
-                'lr': self.alpha_settings['lr']
+                'lr': self.alpha_settings['mask_lr']
             }
             grouped_params.append(alpha_params)
             
@@ -773,7 +773,7 @@ class Imagine(nn.Module):
         
         self.optimizer.zero_grad()
 
-        if (i + 1) % self.save_every == 0:
+        if i == 0 or (i + 1) % self.save_every == 0:
             with torch.no_grad():
                 if self.alpha_dropout:
                     alpha_w_dropout = self.model.model.alpha()
@@ -826,7 +826,7 @@ class Imagine(nn.Module):
 #                 if self.fixed_alpha is None:
 #                     save_image(alpha_image, str(self.alpha_filename))
                 if self.alpha_dropout:
-                    save_image(alpha_w_dropout_image, f'./{self.save_dir}/alpha_dropout.png')
+                    save_image(alpha_w_dropout_image, f'./{self.save_dir}/alpha_w_dropout.png')
     
                 if self.save_grid: 
                     # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
@@ -836,12 +836,14 @@ class Imagine(nn.Module):
                 if pbar is not None:
                     pbar.update(1)
                 else:
-                    print(f'bg image updated at "./{str(self.bg_filename)}"')
-                    print(f'fg image updated at "./{str(self.fg_filename)}"')
-                    print(f'composite image updated at "./{str(self.comp_filename)}"')
-                    if self.multiple:
-                        print(f'bg2 image updated at "./{str(self.bg2_filename)}"')
-                        print(f'composite2 image updated at "./{str(self.comp2_filename)}"')
+#                     print(f'bg image updated at "./{str(self.bg_filename)}"')
+#                     print(f'fg image updated at "./{str(self.fg_filename)}"')
+#                     print(f'composite image updated at "./{str(self.comp_filename)}"')
+#                     if self.multiple:
+#                         print(f'bg2 image updated at "./{str(self.bg2_filename)}"')
+#                         print(f'composite2 image updated at "./{str(self.comp2_filename)}"')
+                    if self.save_grid:
+                    self.save_grid(f'grid image updated at "./{str(self.grid_filename)}"')
                 
                 if self.save_progress:
                     total_iterations = epoch * self.iterations + i
@@ -860,7 +862,7 @@ class Imagine(nn.Module):
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                             save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'.{num:04d}{self.seed_suffix}.png'))
                         if self.alpha_dropout:
-                            save_image(alpha_w_dropout_image, Path(f'./{self.save_dir}/' + 'alpha_dropout' + f'.{num:04d}{self.seed_suffix}.png'))
+                            save_image(alpha_w_dropout_image, Path(f'./{self.save_dir}/' + 'alpha_w_dropout' + f'.{num:04d}{self.seed_suffix}.png'))
                     else:
 #                         save_image(bg_image, Path(f'./{self.bg_text_path}.{num:04d}{self.seed_suffix}.png'))
 #                         save_image(fg_image, Path('./fg' + f'.{num:04d}{self.seed_suffix}.png'))
@@ -874,7 +876,7 @@ class Imagine(nn.Module):
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                             save_image(grid_image, Path('./grid' + f'.{num:04d}{self.seed_suffix}.png'))
                         if self.alpha_dropout:
-                            save_image(alpha_w_dropout_image, Path('./alpha_dropout' + f'.{num:04d}{self.seed_suffix}.png'))
+                            save_image(alpha_w_dropout_image, Path('./alpha_w_dropout' + f'.{num:04d}{self.seed_suffix}.png'))
                 
                 if self.save_best and top_score.item() < self.current_best_score:
                     self.current_best_score = top_score.item()
@@ -891,6 +893,8 @@ class Imagine(nn.Module):
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                             save_image(grid_image, Path(f'./{self.save_dir}/' + 'grid' + f'{self.seed_suffix}.png'))
+                        if self.alpha_dropout:
+                            save_image(alpha_w_dropout_image, Path(f'./{self.save_dir}/' + 'alpha_w_dropout' + f'{self.seed_suffix}.png'))
                         
                     else:
 #                         save_image(bg_image, Path(f'./{self.bg_text_path}{self.seed_suffix}.png'))
@@ -904,6 +908,8 @@ class Imagine(nn.Module):
                         if self.save_grid: 
                             # saves a grid of images in the form: bg, bg2, comp, comp2, fg, alpha
                             save_image(grid_image, Path('./grid' + f'{self.seed_suffix}.png'))
+                        if self.alpha_dropout:
+                            save_image(alpha_w_dropout_image, Path('./alpha_w_dropout' + f'{self.seed_suffix}.png'))
                             
                 print("lat_loss1:", losses[0].item())
                 print("cls_loss1:", losses[1].item())
