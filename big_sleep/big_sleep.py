@@ -466,7 +466,6 @@ class Imagine(nn.Module):
         comp_img=None, 
         comp_img2=None,
         encoding=None,
-        train_mask=False,
         lr = .07,
         image_size = 512,
         gradient_accumulate_every = 1,
@@ -555,9 +554,7 @@ class Imagine(nn.Module):
             
         self.optimizer = Adam(grouped_params)
         
-        self.train_mask = train_mask
-        if self.train_mask:
-            self.mask_optimizer = Adam(alpha_params)
+        self.mask_optimizer = Adam(alpha_params)
         
         self.gradient_accumulate_every = gradient_accumulate_every
         self.save_every = save_every
@@ -751,8 +748,7 @@ class Imagine(nn.Module):
             grouped_params.append(alpha_params)
             
         self.optimizer = Adam(grouped_params)
-        if self.train_mask:
-            self.mask_optimizer = Adam(alpha_params)
+        self.mask_optimizer = Adam(alpha_params)
 
     def train_step(self, epoch, i, pbar=None):
         total_loss = 0
