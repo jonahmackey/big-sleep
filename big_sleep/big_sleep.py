@@ -461,7 +461,10 @@ class Imagine(nn.Module):
         comp_text2=None,
         fixed_alpha=None,
         alpha_settings=None,
-        img=None,
+        bg_img=None,
+        bg_img2=None,
+        comp_img=None, 
+        comp_img2=None,
         encoding=None,
         lr = .07,
         image_size = 512,
@@ -581,6 +584,11 @@ class Imagine(nn.Module):
         self.bg_text2 = bg_text2
         self.comp_text2 = comp_text2
         
+        self.bg_img = bg_img
+        self.bg_img2 = bg_img2
+        self.comp_img = comp_img
+        self.comp_img2 = comp_img2
+        
         # create img transform
         self.clip_transform = create_clip_img_transform(224)
         # create starting encoding
@@ -598,12 +606,12 @@ class Imagine(nn.Module):
             if self.save_grid:
                 self.grid_filename = Path(f'./' + 'grid' + f'{self.seed_suffix}.png')
 
-        self.set_clip_encoding(text=bg_text, text_min=bg_text_min, text_ind = "bg")
-        self.set_clip_encoding(text=comp_text, text_min=comp_text_min, text_ind = "comp")
+        self.set_clip_encoding(text=bg_text, img=bg_img, text_min=bg_text_min, text_ind = "bg")
+        self.set_clip_encoding(text=comp_text, img=comp_img, text_min=comp_text_min, text_ind = "comp")
         
         if self.multiple:
-            self.set_clip_encoding(text=bg_text2, text_ind = "bg2")
-            self.set_clip_encoding(text=comp_text2, text_ind = "comp2")
+            self.set_clip_encoding(text=bg_text2, img=bg_img2, text_ind = "bg2")
+            self.set_clip_encoding(text=comp_text2, img=comp_img2, text_ind = "comp2")
             
         
     @property
@@ -614,8 +622,6 @@ class Imagine(nn.Module):
         self.set_clip_encoding(text = text)
 
     def create_clip_encoding(self, text=None, img=None, encoding=None):
-        self.text = text
-        self.img = img
         if encoding is not None:
             encoding = encoding.cuda()
         # elif self.create_story:
@@ -652,18 +658,18 @@ class Imagine(nn.Module):
         if text_ind == "bg":
             self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="bg_max")
             if text_min is not None and text_min != "":
-                self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="bg_min")
+                self.encode_multiple_phrases(text_min, text_type="bg_min")
                 
         elif text_ind == "bg2":
-            self.encode_multiple_phrases(text, text_type="bg_max2")
+            self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="bg_max2")
             
         elif text_ind == "comp":
             self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="comp_max")
             if text_min is not None and text_min != "":
-                self.encode_multiple_phrases(text_min, img=img, encoding=encoding, text_type="comp_min")
+                self.encode_multiple_phrases(text_min, text_type="comp_min")
                 
         else: # text_ind == "comp2"
-            self.encode_multiple_phrases(text, text_type="comp_max2")
+            self.encode_multiple_phrases(text, img=img, encoding=encoding, text_type="comp_max2")
 
     def set_clip_encoding(self, text=None, img=None, encoding=None, text_min="", text_ind=None):
         self.current_best_score = 0
