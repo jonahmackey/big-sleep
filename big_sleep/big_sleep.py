@@ -194,7 +194,7 @@ class Model(nn.Module):
             )
             if self.alpha_settings['circle_init']:
                 current_state = alpha.state_dict()
-                circle_state = torch.load(torch.load(f'./drive/MyDrive/bigsleep/alpha_params/alpha{alpha.num_layers}x{alpha.layer_width}_circle.pth'))
+                circle_state = torch.load(f'./drive/MyDrive/bigsleep/alpha_params/alpha{alpha.num_layers}x{alpha.layer_width}_circle.pth')
                 new_state = OrderedDict()
                 
                 for key in current_state:
