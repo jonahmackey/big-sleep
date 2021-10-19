@@ -826,14 +826,14 @@ class Imagine(nn.Module):
                 self.model.model.latents3.train()
                 if self.fixed_alpha is None:
                     self.model.model.alpha.train()
-#                 save_image(bg_image, str(self.bg_filename))
-#                 save_image(fg_image, str(self.fg_filename))
-#                 save_image(comp_image, str(self.comp_filename))
-#                 if self.multiple:
-#                     save_image(bg2_image, str(self.bg2_filename))
-#                     save_image(comp2_image, str(self.comp2_filename))
-#                 if self.fixed_alpha is None:
-#                     save_image(alpha_image, str(self.alpha_filename))
+                save_image(bg_image, str(self.bg_filename))
+                save_image(fg_image, str(self.fg_filename))
+                save_image(comp_image, str(self.comp_filename))
+                if self.multiple:
+                    save_image(bg2_image, str(self.bg2_filename))
+                    save_image(comp2_image, str(self.comp2_filename))
+                if self.fixed_alpha is None:
+                    save_image(alpha_image, str(self.alpha_filename))
                 if self.alpha_dropout:
                     save_image(alpha_w_dropout_image, f'./{self.save_dir}/alpha_w_dropout.png')
     
