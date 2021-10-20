@@ -476,7 +476,8 @@ class Imagine(nn.Module):
                 top_score, best = torch.topk(losses[2], k=1, largest=False)
                 image = self.model.model()[best].cpu()
                 self.model.model.latents.train()
-
+                
+                print("datatype:", image.dtype, "\n filepath:", str(self.filename))
                 save_image(image, str(self.filename))
                 if pbar is not None:
                     pbar.update(1)
