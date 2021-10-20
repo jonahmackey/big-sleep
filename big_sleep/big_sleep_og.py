@@ -477,7 +477,7 @@ class Imagine(nn.Module):
                 image = self.model.model()[best].cpu()
                 self.model.model.latents.train()
                 
-                print("datatype:", image.dtype, "\n filepath:", str(self.filename))
+                print("datatype:", image.dtype, "\nfilepath:", str(self.filename), "\nshape:", image.shape)
                 save_image(image, str(self.filename))
                 if pbar is not None:
                     pbar.update(1)
