@@ -322,12 +322,19 @@ class ModifiedResNet(nn.Module):
             return x
 
         x = x.type(self.conv1.weight.dtype)
+        print("change type: ", x.shape, x.min(), x.max(), x.type(), "\n")
         x = stem(x)
+        print("stem: ", x.shape, x.min(), x.max(), x.type(), "\n")
         x = self.layer1(x)
+        print("L1: ", x.shape, x.min(), x.max(), x.type(), "\n")
         x = self.layer2(x)
+        print("L2: ", x.shape, x.min(), x.max(), x.type(), "\n")
         x = self.layer3(x)
+        print("L3: ", x.shape, x.min(), x.max(), x.type(), "\n")
         x = self.layer4(x)
+        print("L4: ", x.shape, x.min(), x.max(), x.type(), "\n")
         x = self.attnpool(x)
+        print("attn: ", x.shape, x.min(), x.max(), x.type(), "\n")
 
         return x
 
