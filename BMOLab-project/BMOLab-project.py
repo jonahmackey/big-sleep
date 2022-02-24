@@ -144,7 +144,9 @@ def saliency_map(title, img_fp=None, img=None, jacob=None, show_result=False, sa
 
     J1 = (1e10 * (J_ * J_).sum(dim=0))  # shape (512, 512)
     J1_ = jonah_utility_func(X=J1.cpu())  # shape (3, 512, 512)
+
     J1 = J1.unsqueeze(dim=0)  # shape (1, 512, 512)
+    J1 = (J1 - J1.min()) / (J1.max() - J1.min())
 
     if show_result:
         show_image(J1, "")
