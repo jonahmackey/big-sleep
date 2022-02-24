@@ -282,27 +282,67 @@ def jacob_svd(title, img_fp=None, img=None, jacob=None, view_sing_values=True, v
     return S, Vt
 
 
-def clip_dream(img_fp, title, scaling_term=0.1, num_iter=5):
+def clip_dream(img_fp, title, scaling_term=5, num_iter=10):
     image = io.read_image(img_fp)  # shape (3, 512, 512)
     show_image(image, "Step 0")
 
     for i in range(num_iter):
-        iter_title = title + f"{i + 1}"
-        S, Vt = jacob_svd(title=iter_title,
+        S, Vt = jacob_svd(title=title,
                           img=image,
-                          view_sing_values=True,
-                          view_top_k=1,
-                          save_result=True,
-                          show_result=True)
+                          view_sing_values=False,
+                          view_top_k=0,
+                          save_result=False,
+                          show_result=False)
 
-        # get top principal component
+        # view singular values
+        plt.figure(figsize=(10, 10))
+
+        x = np.arange(start=1, stop=S.shape[0] + 1, step=1)
+        plt.scatter(x, S)
+        plt.xlabel("Rank")
+        plt.ylabel("Value")
+        plt.title(f"Singular Values of Jacobian iter {i+1}")
+
+        plt.savefig(f"Images/{title}/SV_iter{i+1}.png")
+        plt.show()
+
+        # get top singular vector
         PC1 = Vt[0]  # shape (3, 512, 512)
+        print("PC1 max min: ", PC1.max(), PC1.min())
+
+        # visualize top singular vector
+        vmin, vmax = torch.quantile(input=PC1.abs(), q=torch.tensor([0., 0.999]))
+
+        # Plot the RGB channels of PC separately (yellow = 1, purple = 0)
+        fig = plt.figure(figsize=(30, 10))
+
+        fig.add_subplot(1, 3, 1)
+        plt.axis("off")
+        plt.title(f"red iter {i + 1}")
+        plt.imshow(PC1[0], vmin=-vmax, vmax=vmax, cmap='PiYG')
+        plt.colorbar(shrink=0.5)
+
+        fig.add_subplot(1, 3, 2)
+        plt.axis("off")
+        plt.title(f"green iter {i + 1}")
+        plt.imshow(PC1[1], vmin=-vmax, vmax=vmax, cmap='PiYG')
+        plt.colorbar(shrink=0.5)
+
+        fig.add_subplot(1, 3, 3)
+        plt.axis("off")
+        plt.title(f"blue iter {i + 1}")
+        plt.imshow(PC1[2], vmin=-vmax, vmax=vmax, cmap='PiYG')
+        plt.colorbar(shrink=0.5)
+
+        plt.savefig(f"Images/{title}/PC1_iter{i + 1}.png")
+
+        plt.show()
 
         # add top singular vector to image
         image = image + scaling_term * PC1  # shape (3, 512, 512)
 
         show_image(image, f"Step {i + 1}")
-        utils.save_image(image.float(), f"Images/dream/dream_iter{i + 1}.png")
+        utils.save_image(image.float(), f"Images/{title}/dream_iter{i + 1}.png")
 
     return image
 
@@ -310,11 +350,13 @@ def clip_dream(img_fp, title, scaling_term=0.1, num_iter=5):
 if __name__ == "__main__":
     print("blah")
 
-    jacob, saliency_gray, saliency_rgb = saliency_map(title="ViT",
-                                                      img_fp="Images/crab.png",
-                                                      show_result=True,
-                                                      save_result=True)
+    # jacob, saliency_gray, saliency_rgb = saliency_map(title="",
+    #                                                   img_fp="Images/crab.png",
+    #                                                   show_result=True,
+    #                                                   save_result=False)
+    #
+    # print("obtained salience")
+    #
+    # s, vt = jacob_svd(title="", jacob=jacob, view_top_k=5, show_result=True, save_result=False)
 
-    print("obtained salience")
-
-    s, vt = jacob_svd(title="ViT", jacob=jacob, view_top_k=5, show_result=True, save_result=True)
+    dreamed_image = clip_dream("Images/dog.jpg", title="dream_dog", scaling_term=10000, num_iter=10)
