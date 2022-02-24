@@ -23,6 +23,10 @@ import kornia as K
 # COMP TEXT "a crab walking through a field of grass"
 # BG_TEXT "a photo of an empty field of grass"
 
+# ---Get CLIP---
+perceptor, normalize_image = load("ViT-B/32", jit=False)
+# "RN101", "ViT-B/32"
+
 
 # ---Misc Helpers---
 def show_image(img, text):
@@ -51,11 +55,6 @@ def show_image(img, text):
     cv2.imshow(text, np_image.astype(np.uint8))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
-
-# ---Get CLIP---
-perceptor, normalize_image = load("ViT-B/32", jit=False)
-# "RN101", "ViT-B/32"
 
 
 def get_cutouts(img, num_cutouts, legal_cutouts):
@@ -282,9 +281,13 @@ def jacob_svd(title, img_fp=None, img=None, jacob=None, view_sing_values=True, v
     return S, Vt
 
 
-def clip_dream(img_fp, title, scaling_term=5, num_iter=10):
+def clip_dream(img_fp, title, scaling_term=5, num_iter=10, show_result=False):
     image = io.read_image(img_fp)  # shape (3, 512, 512)
-    show_image(image, "Step 0")
+    print("input image range: ", image.min(), image.max())
+    image = (image - image.min()) / (image.max() - image.min())
+
+    if show_result:
+        show_image(image, "Step 0")
 
     for i in range(num_iter):
         S, Vt = jacob_svd(title=title,
@@ -304,7 +307,9 @@ def clip_dream(img_fp, title, scaling_term=5, num_iter=10):
         plt.title(f"Singular Values of Jacobian iter {i+1}")
 
         plt.savefig(f"Images/{title}/SV_iter{i+1}.png")
-        plt.show()
+
+        if show_result:
+            plt.show()
 
         # get top singular vector
         PC1 = Vt[0]  # shape (3, 512, 512)
@@ -336,12 +341,16 @@ def clip_dream(img_fp, title, scaling_term=5, num_iter=10):
 
         plt.savefig(f"Images/{title}/PC1_iter{i + 1}.png")
 
-        plt.show()
+        if show_result:
+            plt.show()
 
         # add top singular vector to image
         image = image + scaling_term * PC1  # shape (3, 512, 512)
 
-        show_image(image, f"Step {i + 1}")
+        if show_result:
+            show_image(image, f"Step {i + 1}")
+
+        image = (image - image.min()) / (image.max() - image.min())
         utils.save_image(image.float(), f"Images/{title}/dream_iter{i + 1}.png")
 
     return image
@@ -359,4 +368,4 @@ if __name__ == "__main__":
     #
     # s, vt = jacob_svd(title="", jacob=jacob, view_top_k=5, show_result=True, save_result=False)
 
-    dreamed_image = clip_dream("Images/dog.jpg", title="dream_dog", scaling_term=10000, num_iter=10)
+    dreamed_image = clip_dream("Images/dog.jpg", title="dream_dog6", scaling_term=30, num_iter=5, show_result=True)
