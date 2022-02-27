@@ -1,7 +1,7 @@
 import cv2
 
-from big_sleep.clip import load
-from big_sleep.big_sleep import rand_cutout
+from clip import load
+from big_sleep import rand_cutout
 
 import torch
 from torch.autograd.functional import jacobian
