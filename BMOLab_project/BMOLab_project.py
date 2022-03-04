@@ -486,26 +486,47 @@ def clip_dream2(img_fp, title, scaling_term=5, num_iter=10, show_result=False):
         plt.show()
 
     # get top singular vector
-    PC1 = U[0]  # shape (512)
-    print("PC1 max min: ", PC1.max(), PC1.min())
+    PC1 = U[:, 0]  # shape (512)
+    print("PC1 max min: ", PC1.max(), PC1.min(), PC1.shape)
+
+    image1 = image.clone()
+    image2 = image.clone()
 
     for i in range(num_iter):
-        J = get_jacob(img=image)  # shape 512, 3, 512, 512
-        J = J.cpu().detach()
-        J = J.view(512, 3*512*512)  # shape = (512, 3*512*512) = (512 x 786432)
+        ### dream step for image 1 ###
+        J1 = get_jacob(img=image1)  # shape 512, 3, 512, 512
+        J1 = J1.cpu().detach()
+        J1 = J1.view(512, 3*512*512)  # shape = (512, 3*512*512) = (512 x 786432)
 
-        X, _, _, _ = np.linalg.lstsq(J, PC1, rcond=None)
-        print("X info: ", X.shape, X.max(), X.min())
-        X = torch.from_numpy(X).view(3, 512, 512)
+        X1, _, _, _ = np.linalg.lstsq(J1, PC1, rcond=None)
+        print("X1 info: ", X1.shape, X1.max(), X1.min())
+        X1 = torch.from_numpy(X1).view(3, 512, 512)
 
         # add top singular vector to image
-        image = image + scaling_term * X  # shape (3, 512, 512)
+        image1 = image1 + scaling_term * X1  # shape (3, 512, 512)
 
+        ### dream step for image 2 ###
+        J2 = get_jacob(img=image2)  # shape 512, 3, 512, 512
+        J2 = J2.cpu().detach()
+        J2 = J2.view(512, 3 * 512 * 512)  # shape = (512, 3*512*512) = (512 x 786432)
+
+        X2, _, _, _ = np.linalg.lstsq(J2, -PC1, rcond=None)
+        print("X2 info: ", X2.shape, X2.max(), X2.min())
+        X2 = torch.from_numpy(X2).view(3, 512, 512)
+
+        # add top singular vector to image
+        image2 = image2 + scaling_term * X2  # shape (3, 512, 512)
+
+        # display/save results
         if show_result:
-            show_image(image, f"Step {i + 1}")
+            show_image(image1, f"Dream step {i + 1}")
+            show_image(image2, f"neg Dream step {i + 1}")
 
-        image = (image - image.min()) / (image.max() - image.min())
-        utils.save_image(image.float(), f"Images/{title}/dream_iter{i + 1}.png")
+        image1 = (image1 - image1.min()) / (image1.max() - image1.min())
+        utils.save_image(image1.float(), f"Images/{title}/dream_iter{i + 1}.png")
+
+        image2 = (image2 - image2.min()) / (image2.max() - image2.min())
+        utils.save_image(image2.float(), f"Images/{title}/neg_dream_iter{i + 1}.png")
 
     return image
 
@@ -575,33 +596,41 @@ def reset_block_layer(block, block_name, model_name):
 if __name__ == "__main__":
     print("blah")
 
-    rn101_trainable_layers = ["conv1", "conv2", "conv3", "layer1:0", "layer1:1",
-                              "layer1:2", "layer2:0", "layer2:1", "layer2:2", "layer2:3", "layer3:0", "layer3:1",
-                              "layer3:2", "layer3:3", "layer3:4", "layer3:5", "layer3:6", "layer3:7", "layer3:8",
-                              "layer3:9", "layer3:10", "layer3:11", "layer3:12", "layer3:13", "layer3:14", "layer3:15",
-                              "layer3:16", "layer3:17", "layer3:18", "layer3:19", "layer3:20", "layer3:21", "layer3:22",
-                              "layer4:0", "layer4:1", "layer4:2", "attnpool"]
+    perceptor, normalize_image = load("ViT-B/32", jit=False)
 
-    vit_trainable_layers = ["conv1", "ln_pre", "transformer:0", "transformer:1", "transformer:2", "transformer:3",
-                            "transformer:4", "transformer:5", "transformer:6", "transformer:7", "transformer:8",
-                            "transformer:9", "transformer:10", "transformer:11", "ln_post"]
+    dream = clip_dream2(img_fp="Images/dog.jpg", title="dream_dog_m2_vit_s=01", scaling_term=0.1, num_iter=20)
 
-    # independent randomization
-    for layer in vit_trainable_layers:
-        # get clip model
-        perceptor, normalize_image = load("ViT-B/32", jit=False)
+    # rn101_trainable_layers = ["conv1", "conv2", "conv3", "layer1:0", "layer1:1",
+    #                           "layer1:2", "layer2:0", "layer2:1", "layer2:2", "layer2:3", "layer3:0", "layer3:1",
+    #                           "layer3:2", "layer3:3", "layer3:4", "layer3:5", "layer3:6", "layer3:7", "layer3:8",
+    #                           "layer3:9", "layer3:10", "layer3:11", "layer3:12", "layer3:13", "layer3:14", "layer3:15",
+    #                           "layer3:16", "layer3:17", "layer3:18", "layer3:19", "layer3:20", "layer3:21", "layer3:22",
+    #                           "layer4:0", "layer4:1", "layer4:2", "attnpool"]
+    #
+    # vit_trainable_layers = ["conv1", "ln_pre", "transformer:0", "transformer:1", "transformer:2", "transformer:3",
+    #                         "transformer:4", "transformer:5", "transformer:6", "transformer:7", "transformer:8",
+    #                         "transformer:9", "transformer:10", "transformer:11", "ln_post"]
+    #
+    # # cascading randomization
+    # for i in range(len(rn101_trainable_layers) - 1):
+    #     # get clip model
+    #     perceptor, normalize_image = load("RN101", jit=False)
+    #
+    #     layers = rn101_trainable_layers[i:]
+    #
+    #     # reset model layer
+    #     reset_model_layers(model=perceptor, model_name="RN101", layers=layers)
+    #
+    #     # compute saliency maps
+    #     jacob, saliency_gray, saliency_rgb = saliency_map(title="", img_fp="Images/crab.png")
+    #
+    #     # save saliency maps
+    #     utils.save_image(saliency_gray.float(),
+    #                      f"Images/sanity_checks/RN101/cascading_randomization/saliency_gray_{layers[0]}_to_{layers[-1]}.png")
+    #     utils.save_image(saliency_rgb.float(),
+    #                      f"Images/sanity_checks/RN101/cascading_randomization/saliency_rgb_{layers[0]}_to_{layers[-1]}.png")
+    #
+    #     print(f"computed cascading randomized saliency for {layers[0]} to {layers[-1]}\n")
 
-        # reset model layer
-        reset_model_layers(model=perceptor, model_name="ViT", layers=[layer])
-
-        # compute saliency maps
-        jacob, saliency_gray, saliency_rgb = saliency_map(layer, img_fp="Images/crab.png")
-
-        # save saliency maps
-        utils.save_image(saliency_gray.float(),
-                         f"Images/sanity_checks/ViT/independent_randomization/saliency_gray_{layer}.png")
-        utils.save_image(saliency_rgb.float(),
-                         f"Images/sanity_checks/ViT/independent_randomization/saliency_rgb_{layer}.png")
-
-        print(f"computed indep randomized saliency for {layer}")
-
+    # perceptor, normalize_image = load("RN101", jit=False)
+    # jacob, saliency_gray, saliency_rgb = saliency_map(title="", img_fp="Images/crab.png", show_result=True)
