@@ -13,6 +13,7 @@ from torchvision import io, utils
 from matplotlib import colors, cm
 import matplotlib.pyplot as plt
 import numpy as np
+from torch.fft import *
 # from collections import OrderedDict
 
 # import sklearn
@@ -148,7 +149,7 @@ def clip_similarity(img):
 
 
 # ---Get Jacobian of image embedding wrt Image pixels---
-def get_jacob(img_fp=None, img=None):
+def get_jacob(img_fp=None, img=None, weight_freq=False):
     """
     Get jacobian of the image embedding with respect to image pixels, where the image
     is read from img_fp or is represented as a tensor by img.
@@ -161,6 +162,10 @@ def get_jacob(img_fp=None, img=None):
         image = img
 
     image = (image - image.min()) / (image.max() - image.min())  # norm to range [0, 1]
+
+    if weight_freq:
+        image = weight_img_freq(image)  # shape (3, 512, 512)
+
     image = torch.unsqueeze(image, dim=0).float()  # shape (1, 3, 512, 512)
     image.requires_grad = True
 
@@ -299,9 +304,9 @@ def jonah_utility_func(X, lower_quantile=0.01, upper_quantile=0.99, apply_log=Tr
 
 # ---SVD on jacobian---
 def jacob_svd(title, img_fp=None, img=None, jacob=None, view_sing_values=True, view_top_k=10, show_result=False,
-              save_result=False):
+              save_result=False, weight_freq=False):
     if jacob is None:
-        J = get_jacob(img_fp, img)  # shape (512, 3, 512, 512)
+        J = get_jacob(img_fp, img, weight_freq)  # shape (512, 3, 512, 512)
     else:
         J = jacob
 
@@ -318,13 +323,26 @@ def jacob_svd(title, img_fp=None, img=None, jacob=None, view_sing_values=True, v
 
     # plot singular values
     if view_sing_values:
-        plt.figure(figsize=(10, 10))
-
         x = np.arange(start=1, stop=S.shape[0] + 1, step=1)
-        plt.scatter(x, S)
-        plt.xlabel("Rank")
-        plt.ylabel("Value")
+
+        fig = plt.figure(figsize=(20, 10))
+
+        # singular values
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax1.scatter(x, S, marker=".")
+
+        ax1.set_ylabel("Value")
+        ax1.set_xlabel("Rank")
         plt.title("Singular Values of Jacobian")
+
+        # singular values (log)
+        ax2 = fig.add_subplot(1, 2, 2)
+        ax2.scatter(x, S, marker=".")
+        ax2.set_yscale('log')
+
+        ax2.set_ylabel("Value (log)")
+        ax2.set_xlabel("Rank")
+        plt.title("Singular Values of Jacobian (log)")
 
         plt.savefig(f"Images/{title}/SV_jacob.png")
 
@@ -530,6 +548,17 @@ def clip_dream2(img_fp, title, scaling_term=5, num_iter=10, show_result=False):
 
     return image
 
+# rn101_trainable_layers = ["conv1", "conv2", "conv3", "layer1:0", "layer1:1",
+#                           "layer1:2", "layer2:0", "layer2:1", "layer2:2", "layer2:3", "layer3:0", "layer3:1",
+#                           "layer3:2", "layer3:3", "layer3:4", "layer3:5", "layer3:6", "layer3:7", "layer3:8",
+#                           "layer3:9", "layer3:10", "layer3:11", "layer3:12", "layer3:13", "layer3:14", "layer3:15",
+#                           "layer3:16", "layer3:17", "layer3:18", "layer3:19", "layer3:20", "layer3:21", "layer3:22",
+#                           "layer4:0", "layer4:1", "layer4:2", "attnpool"]
+#
+# vit_trainable_layers = ["conv1", "ln_pre", "transformer:0", "transformer:1", "transformer:2", "transformer:3",
+#                         "transformer:4", "transformer:5", "transformer:6", "transformer:7", "transformer:8",
+#                         "transformer:9", "transformer:10", "transformer:11", "ln_post"]
+
 
 def reset_model_layers(model, model_name, layers):
     if model_name == "RN101":
@@ -593,44 +622,29 @@ def reset_block_layer(block, block_name, model_name):
     print("")
 
 
+def weight_img_freq(image, eps=1e-5):
+    image = (image - image.min()) / (image.max() - image.min())
+
+    image_fft = rfft2(image)  # shape (3, 512, 257)
+    image_fft2 = image_fft / (image_fft.abs() + eps)
+
+    image_freq_weighted = irfft2(image_fft2)  # shape (3, 512, 512)
+    image_freq_weighted = (image_freq_weighted - image_freq_weighted.min()) / (
+                image_freq_weighted.max() - image_freq_weighted.min())
+
+    # show_image(image_freq_weighted, text="")
+    return image_freq_weighted
+
+
 if __name__ == "__main__":
     print("blah")
 
     perceptor, normalize_image = load("ViT-B/32", jit=False)
 
-    dream = clip_dream2(img_fp="Images/dog.jpg", title="dream_dog_m2_vit_s=01", scaling_term=0.1, num_iter=20)
+    files = ["bananas.jpg", "bird.jpg", "crab.png", "david.jpg", "dog.jpg", "street_scene.jpg", "two_bananas.jpg",
+             "two_dogs.jpg", "xavier.jpg"]
 
-    # rn101_trainable_layers = ["conv1", "conv2", "conv3", "layer1:0", "layer1:1",
-    #                           "layer1:2", "layer2:0", "layer2:1", "layer2:2", "layer2:3", "layer3:0", "layer3:1",
-    #                           "layer3:2", "layer3:3", "layer3:4", "layer3:5", "layer3:6", "layer3:7", "layer3:8",
-    #                           "layer3:9", "layer3:10", "layer3:11", "layer3:12", "layer3:13", "layer3:14", "layer3:15",
-    #                           "layer3:16", "layer3:17", "layer3:18", "layer3:19", "layer3:20", "layer3:21", "layer3:22",
-    #                           "layer4:0", "layer4:1", "layer4:2", "attnpool"]
-    #
-    # vit_trainable_layers = ["conv1", "ln_pre", "transformer:0", "transformer:1", "transformer:2", "transformer:3",
-    #                         "transformer:4", "transformer:5", "transformer:6", "transformer:7", "transformer:8",
-    #                         "transformer:9", "transformer:10", "transformer:11", "ln_post"]
-    #
-    # # cascading randomization
-    # for i in range(len(rn101_trainable_layers) - 1):
-    #     # get clip model
-    #     perceptor, normalize_image = load("RN101", jit=False)
-    #
-    #     layers = rn101_trainable_layers[i:]
-    #
-    #     # reset model layer
-    #     reset_model_layers(model=perceptor, model_name="RN101", layers=layers)
-    #
-    #     # compute saliency maps
-    #     jacob, saliency_gray, saliency_rgb = saliency_map(title="", img_fp="Images/crab.png")
-    #
-    #     # save saliency maps
-    #     utils.save_image(saliency_gray.float(),
-    #                      f"Images/sanity_checks/RN101/cascading_randomization/saliency_gray_{layers[0]}_to_{layers[-1]}.png")
-    #     utils.save_image(saliency_rgb.float(),
-    #                      f"Images/sanity_checks/RN101/cascading_randomization/saliency_rgb_{layers[0]}_to_{layers[-1]}.png")
-    #
-    #     print(f"computed cascading randomized saliency for {layers[0]} to {layers[-1]}\n")
-
-    # perceptor, normalize_image = load("RN101", jit=False)
-    # jacob, saliency_gray, saliency_rgb = saliency_map(title="", img_fp="Images/crab.png", show_result=True)
+    for file in files:
+        name = file[:-4]
+        U, S, Vt = jacob_svd(f"march9/freq_weighting/{name}", img_fp=f"Images/{file}", view_sing_values=True, view_top_k=15, save_result=True,
+                             weight_freq=True)
