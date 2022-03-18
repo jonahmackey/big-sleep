@@ -149,7 +149,7 @@ def clip_similarity(img):
 
 
 # ---Get Jacobian of image embedding wrt Image pixels---
-def get_jacob(img_fp=None, img=None, weight_freq=False):
+def get_jacob(img_fp=None, img=None):
     """
     Get jacobian of the image embedding with respect to image pixels, where the image
     is read from img_fp or is represented as a tensor by img.
@@ -162,9 +162,6 @@ def get_jacob(img_fp=None, img=None, weight_freq=False):
         image = img
 
     image = (image - image.min()) / (image.max() - image.min())  # norm to range [0, 1]
-
-    if weight_freq:
-        image = weight_img_freq(image)  # shape (3, 512, 512)
 
     image = torch.unsqueeze(image, dim=0).float()  # shape (1, 3, 512, 512)
     image.requires_grad = True
@@ -304,9 +301,9 @@ def jonah_utility_func(X, lower_quantile=0.01, upper_quantile=0.99, apply_log=Tr
 
 # ---SVD on jacobian---
 def jacob_svd(title, img_fp=None, img=None, jacob=None, view_sing_values=True, view_top_k=10, show_result=False,
-              save_result=False, weight_freq=False):
+              save_result=False):
     if jacob is None:
-        J = get_jacob(img_fp, img, weight_freq)  # shape (512, 3, 512, 512)
+        J = get_jacob(img_fp, img)  # shape (512, 3, 512, 512)
     else:
         J = jacob
 
@@ -622,7 +619,9 @@ def reset_block_layer(block, block_name, model_name):
     print("")
 
 
-def weight_img_freq(image, eps=1e-5):
+def norm_img_freq(image):
+    eps = 1e-4
+
     image = (image - image.min()) / (image.max() - image.min())
 
     image_fft = rfft2(image)  # shape (3, 512, 257)
@@ -636,15 +635,47 @@ def weight_img_freq(image, eps=1e-5):
     return image_freq_weighted
 
 
+def jacob_freq_normed(img_fp=None, img=None, eps=1e-444):
+    if img_fp is not None:
+        image = io.read_image(img_fp).cuda()  # shape (3, 512, 512)
+    else:
+        image = img
+
+    image = (image - image.min()) / (image.max() - image.min())  # norm to range [0, 1]
+
+    image = torch.unsqueeze(image, dim=0).float()  # shape (1, 3, 512, 512)
+    image.requires_grad = True
+
+    # Get dE / dI
+    J = get_jacob(img=image)  # shape (512, 3, 512, 512)
+
+    # Get dI^* / dI
+    J_freq = jacobian(func=norm_img_freq, inputs=image).squeeze()  # shape (3, 512, 512, 3, 512, 512)
+
+    return J
+
+# get image
+# get I~ and store |I~| locally
+# get I~*
+# get I*
+# computer encoding from I* to E
+
+
+
+
 if __name__ == "__main__":
     print("blah")
 
     perceptor, normalize_image = load("ViT-B/32", jit=False)
 
-    files = ["bananas.jpg", "bird.jpg", "crab.png", "david.jpg", "dog.jpg", "street_scene.jpg", "two_bananas.jpg",
-             "two_dogs.jpg", "xavier.jpg"]
+    image = io.read_image("Images/crab.png").cuda()  # shape (3, 512, 512)
+    image = (image - image.min()) / (image.max() - image.min())  # norm to range [0, 1]
+    image = torch.unsqueeze(image, dim=0).float()  # shape (1, 3, 512, 512)
+    image.requires_grad = True
 
-    for file in files:
-        name = file[:-4]
-        U, S, Vt = jacob_svd(f"march9/freq_weighting/{name}", img_fp=f"Images/{file}", view_sing_values=True, view_top_k=15, save_result=True,
-                             weight_freq=True)
+    # Get dI^* / dI
+    J_freq = jacobian(func=norm_img_freq, inputs=image).squeeze()  # shape (3, 512, 512, 3, 512, 512)
+
+    print(J_freq.shape, J_freq.min(), J_freq.max())
+
+
