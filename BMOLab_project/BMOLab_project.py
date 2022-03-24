@@ -661,8 +661,6 @@ def jacob_freq_normed(img_fp=None, img=None, eps=1e-444):
 # computer encoding from I* to E
 
 
-
-
 if __name__ == "__main__":
     print("blah")
 
@@ -673,9 +671,27 @@ if __name__ == "__main__":
     image = torch.unsqueeze(image, dim=0).float()  # shape (1, 3, 512, 512)
     image.requires_grad = True
 
-    # Get dI^* / dI
-    J_freq = jacobian(func=norm_img_freq, inputs=image).squeeze()  # shape (3, 512, 512, 3, 512, 512)
+    eps = 1e-4
 
-    print(J_freq.shape, J_freq.min(), J_freq.max())
+    # Get I~
+    image_fft = rfft2(image)  # shape (1, 3, 512, 257)
+
+    image_fft_norm = torch.norm(image_fft, dim=[-2, -1]).squeeze() # shape (3)
+    image_fft2 = image_fft / (image_fft.abs() + eps) # shape (1, 3, 512, 257)
+
+    image_freq_weighted = irfft2(image_fft2).squeeze()  # shape (3, 512, 512)
+
+    image_freq_weighted = image_freq_weighted.permute(1, 2, 0)  # (512, 512, 3)
+
+    input = image_freq_weighted * image_fft_norm  # shape (512, 512, 3)
+    input = input.permute(2, 0, 1).unsqueeze(dim=0)  # shape (1, 3, 512, 512)
+    input = (input - input.min()) / (input.max() - input.min())  # norm to range [0, 1]
+
+    # jacobian of image embedding wrt image pixels
+    J = jacobian(func=embed_image, inputs=input).squeeze()  # shape (512, 3, 512, 512)
+
+    U, S, Vt = jacob_svd("freq_normed_J", jacob=J, view_sing_values=True, view_top_k=10, show_result=True, save_result=True)
+
+
 
 
