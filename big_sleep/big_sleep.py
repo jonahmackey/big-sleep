@@ -19,9 +19,9 @@ from PIL import Image
 from tqdm import tqdm, trange
 from collections import OrderedDict
 
-from ema import EMA
-from alpha import Alpha
-from resample import resample
+from bigsleep.ema import EMA
+from bigsleep.alpha import Alpha
+from bigsleep.resample import resample
 from biggan import BigGAN
 from clip import load, tokenize
 
