@@ -19,7 +19,7 @@ from PIL import Image
 from tqdm import tqdm, trange
 from collections import OrderedDict
 
-from big_sleep.ema import EMA
+from ema import EMA
 from alpha import Alpha
 from resample import resample
 from biggan import BigGAN
