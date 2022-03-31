@@ -22,8 +22,8 @@ from collections import OrderedDict
 from .ema import EMA
 from .alpha import Alpha
 from .resample import resample
-from biggan import BigGAN
-from clip import load, tokenize
+from .biggan import BigGAN
+from .clip import load, tokenize
 
 assert torch.cuda.is_available(), 'CUDA must be available in order to use Big Sleep'
 
