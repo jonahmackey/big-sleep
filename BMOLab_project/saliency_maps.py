@@ -3,7 +3,7 @@ from torchvision import io, utils
 import torch.nn as nn
 from torch.autograd.functional import jacobian
 
-from big_sleep.clip import load, tokenize
+from clip import load, tokenize
 from utils import *
 
 
@@ -13,6 +13,7 @@ bg_text = "a crab walking"
 
 perceptor, normalize_image = load("ViT-B/32", jit=False)
 
+
 def embed_image(img):
     """
     Embed img into CLIP.
@@ -20,6 +21,7 @@ def embed_image(img):
     - img.shape = (1, 3, H, W)
     - entries of img lie in the range [0, 1]
     """
+
     num_cutouts = 150
 
     # image_tensor has shape 1x3xHxW
