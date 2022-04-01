@@ -30,8 +30,10 @@ def embed_image(img):
     legal_cutouts = torch.arange(start=1, end=16, step=1, dtype=torch.float32).cuda()
     legal_cutouts = torch.round((im_size * 7) / (7 + legal_cutouts)).int()
 
-    image_into = get_cutouts(img=img, num_cutouts=num_cutouts,
-                             legal_cutouts=legal_cutouts)  # shape (num_cutouts, 3, 224, 224)
+    image_into = get_cutouts(img=img,
+                             num_cutouts=num_cutouts,
+                             legal_cutouts=legal_cutouts,
+                             one_resize=False)  # shape (num_cutouts, 3, 224, 224)
     image_into = normalize_image(image_into)
 
     image_embed = perceptor.encode_image(image_into)  # shape (num_cutouts, 512)

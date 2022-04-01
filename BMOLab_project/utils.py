@@ -36,13 +36,18 @@ def show_image(img, text):
     cv2.destroyAllWindows()
 
 
-def get_cutouts(img, num_cutouts, legal_cutouts):
+def get_cutouts(img, num_cutouts, legal_cutouts, one_resize=False):
     """
     Helper function to get num_cutouts random cutouts from img. Each random cutouts is resized to (224, 224) after being
     sampled.
 
     - img.shape = (1, 3, H, W)
     """
+
+    if one_resize:
+        resized_img = K.geometry.resize(img, (224, 224), antialias=True) # shape (1, 3, 224, 224)
+        return resized_img
+
     cutouts = []
 
     for i in range(num_cutouts):
