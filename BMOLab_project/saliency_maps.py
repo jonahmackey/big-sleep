@@ -2,6 +2,7 @@ import torch
 from torchvision import io, utils
 import torch.nn as nn
 from torch.autograd.functional import jacobian
+from torch.fft import *
 
 from clip import load, tokenize
 from utils import *
@@ -13,16 +14,52 @@ bg_text = "a crab walking"
 
 perceptor, normalize_image = load("ViT-B/32", jit=False)
 
+#
+# def embed_image(img):
+#     """
+#     Embed img into CLIP.
+#
+#     - img.shape = (1, 3, H, W)
+#     - entries of img lie in the range [0, 1]
+#     """
+#
+#     num_cutouts = 32
+#
+#     # image_tensor has shape 1x3xHxW
+#     im_size = img.shape[2]
+#
+#     legal_cutouts = torch.arange(start=1, end=16, step=1, dtype=torch.float32).cuda()
+#     legal_cutouts = torch.round((im_size * 7) / (7 + legal_cutouts)).int()
+#
+#     image_into = get_cutouts(img=img,
+#                              num_cutouts=num_cutouts,
+#                              legal_cutouts=legal_cutouts,
+#                              one_resize=False)  # shape (num_cutouts, 3, 224, 224)
+#     image_into = normalize_image(image_into)
+#
+#     image_embed = perceptor.encode_image(image_into)  # shape (num_cutouts, 512)
+#     image_embed = image_embed / image_embed.norm(dim=-1, keepdim=True)
+#     image_embed = torch.mean(image_embed, dim=0)  # shape (512)
+#
+#     return image_embed
 
-def embed_image(img):
+
+def embed_image(img, img_fft_abs=1, eps=1e-6, num_cutouts=32, freq_reg=None, one_resize=False):
     """
     Embed img into CLIP.
 
     - img.shape = (1, 3, H, W)
-    - entries of img lie in the range [0, 1]
+    - entries of img lay in the range [0, 1]
+    - freq_reg is in {None, 'norm', 'log'}
     """
 
-    num_cutouts = 150
+    if freq_reg == 'norm':
+        img = irfft2((img_fft_abs - eps) * rfft2(img))  # shape (1, 3, 512, 512)
+    elif freq_reg == 'log':
+        # img = irfft2(torch.exp())
+        img = img
+    else:  # freq_reg = None
+        img = img
 
     # image_tensor has shape 1x3xHxW
     im_size = img.shape[2]
@@ -33,7 +70,7 @@ def embed_image(img):
     image_into = get_cutouts(img=img,
                              num_cutouts=num_cutouts,
                              legal_cutouts=legal_cutouts,
-                             one_resize=False)  # shape (num_cutouts, 3, 224, 224)
+                             one_resize=one_resize)  # shape (num_cutouts, 3, 224, 224)
     image_into = normalize_image(image_into)
 
     image_embed = perceptor.encode_image(image_into)  # shape (num_cutouts, 512)
@@ -43,6 +80,13 @@ def embed_image(img):
     return image_embed
 
 
+def get_embedding_function(img_fft_abs=1, eps=1e-6, num_cutouts=32, freq_reg=None, one_resize=False):
+    def embedding_func(img):
+        return embed_image(img, img_fft_abs, eps, num_cutouts, freq_reg, one_resize)
+
+    return embedding_func
+
+
 def clip_similarity(img):
     """
     Embed img and text into CLIP and compute cosine similarity between their embeddings
@@ -50,7 +94,8 @@ def clip_similarity(img):
     - img.shape = (1, 3, H, W)
     - entries of img lie in the range [0, 1]
     """
-    image_embed = embed_image(img).unsqueeze(dim=0)  # shape (1, 512)
+    embed_image_func = get_embedding_function(num_cutouts=150)
+    image_embed = embed_image_func(img).unsqueeze(dim=0)  # shape (1, 512)
 
     # comp_tokenized_text = tokenize(comp_text).cuda()  # shape (1, 77)
     # bg_tokenized_text = tokenize(bg_text).cuda()  # shape (1, 77)
@@ -79,7 +124,7 @@ def clip_similarity(img):
 
 
 # ---Get Jacobian of image embedding wrt Image pixels---
-def get_jacob(img_fp=None, img=None):
+def get_jacob(img_fp=None, img=None, num_cutouts=32):
     """
     Get jacobian of the image embedding with respect to image pixels, where the image
     is read from img_fp or is represented as a tensor by img.
@@ -97,14 +142,15 @@ def get_jacob(img_fp=None, img=None):
     image.requires_grad = True
 
     # jacobian of image embedding wrt image pixels
-    J = jacobian(func=embed_image, inputs=image).squeeze()  # shape (512, 3, 512, 512)
+    embed_image_func = get_embedding_function(num_cutouts=num_cutouts)
+    J = jacobian(func=embed_image_func, inputs=image).squeeze()  # shape (512, 3, 512, 512)
 
     return J
 
 
-def saliency_map(title, img_fp=None, img=None, jacob=None, show_result=False, save_result=False):
+def saliency_map(title, img_fp=None, img=None, jacob=None, show_result=False, save_result=False, num_cutouts=32):
     if jacob is None:
-        J = get_jacob(img_fp, img)  # shape (512, 3, 512, 512)
+        J = get_jacob(img_fp, img, num_cutouts)  # shape (512, 3, 512, 512)
     else:
         J = jacob
 
@@ -183,7 +229,8 @@ def project_J_on_T(img_fp=None, img=None, text=None):
     image = torch.unsqueeze(image, dim=0).float()  # shape (1, 3, 512, 512)
     image.requires_grad = True
 
-    image_embed = embed_image(image)  # shape (1, 512)
+    embed_image_func = get_embedding_function(cutouts=150)
+    image_embed = embed_image_func(image)  # shape (1, 512)
 
     # get text embed
     tokenized_text = tokenize(text).cuda()  # shape (1, 77)
