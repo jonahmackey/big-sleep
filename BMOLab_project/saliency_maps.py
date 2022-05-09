@@ -12,7 +12,8 @@ comp_text = "a crab walking through a field of grass"
 # bg_text = "a photo of an empty field of grass"
 bg_text = "a crab walking"
 
-perceptor, normalize_image = load("ViT-B/32", jit=False)
+perceptor, normalize_image = load("RN101", jit=False)
+# "ViT-B/32"
 
 #
 # def embed_image(img):

@@ -28,7 +28,7 @@ def clip_dream(img_fp: str,
                rand_direction: bool = False,
                show_result: bool = False,
                make_vid: bool = False,
-               show_saliency: bool = False,
+               save_saliency: bool = False,
                print_losses: bool = False,
                print_gradients: bool = False):
     img = io.read_image(img_fp).cuda()  # shape (3, 512, 512)
@@ -49,16 +49,6 @@ def clip_dream(img_fp: str,
 
     input_img.requires_grad = True
 
-    embed_image_func = get_embedding_function(img_fft_abs=img_fft_abs, eps=eps, num_cutouts=num_cutouts,
-                                              freq_reg=freq_reg, one_resize=one_resize)
-
-    # jacobian of image embedding wrt frequency weighted pixels
-    J = jacobian(func=embed_image_func, inputs=input_img).squeeze()  # shape (512, 3, 512, 512)
-    print("Got freq normed jacobian")
-
-    if show_saliency:
-        _ = saliency_map(title=title, jacob=J, show_result=True, save_result=True)
-
     # get image embedding
     standard_embed_func = get_embedding_function(freq_reg=False, num_cutouts=num_cutouts, one_resize=one_resize)
     E = standard_embed_func(img)  # shape (512)
@@ -74,6 +64,16 @@ def clip_dream(img_fp: str,
         V = V / (V.norm(dim=-1, keepdim=True))
 
     else:
+        embed_image_func = get_embedding_function(img_fft_abs=img_fft_abs, eps=eps, num_cutouts=num_cutouts,
+                                                  freq_reg=freq_reg, one_resize=one_resize)
+
+        # jacobian of image embedding wrt frequency weighted pixels
+        J = jacobian(func=embed_image_func, inputs=input_img).squeeze()  # shape (512, 3, 512, 512)
+        print("Got freq normed jacobian")
+
+        if save_saliency:
+            _ = saliency_map(title=title, jacob=J, show_result=False, save_result=True)
+
         # singular value decomposition
         U, S, Vt = jacob_svd(title=title,
                              jacob=J,
@@ -247,24 +247,45 @@ def make_video(frames_path, fps=5):
 
 if __name__ == "__main__":
     print("blah")
+    #
+    # for i in range(1, 9):
+    #     clip_dream(img_fp="Images/bird.jpg",
+    #                title=f"clip_dream2/rand{i}",
+    #                num_dream_steps=15,
+    #                theta=1,
+    #                sv_index=0,
+    #                threshold=0.1,  # previously was 0.002
+    #                eps=1e-6,
+    #                num_cutouts=32,
+    #                one_resize=False,
+    #                freq_reg=None,
+    #                lr=250,
+    #                max_iters=1000,
+    #                root=True,
+    #                rand_direction=True,
+    #                show_result=False,
+    #                make_vid=True,
+    #                save_saliency=True,
+    #                print_losses=False,
+    #                print_gradients=False)
 
     clip_dream(img_fp="Images/bird.jpg",
-               title="clip_dream2/exp6",
+               title="clip_dream2/exp14",
                num_dream_steps=25,
                theta=1,
-               sv_index=2,
+               sv_index=0,
                threshold=0.1,  # previously was 0.002
                eps=1e-6,
                num_cutouts=32,
                one_resize=False,
-               freq_reg='norm',
+               freq_reg=None,
                lr=250,
                max_iters=1000,
                root=True,
                rand_direction=False,
                show_result=False,
                make_vid=True,
-               show_saliency=True,
+               save_saliency=True,
                print_losses=False,
                print_gradients=False)
 
